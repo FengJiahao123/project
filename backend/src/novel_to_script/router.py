@@ -8,25 +8,22 @@ from novel_to_script.models import (
     Meta,
 )
 from novel_to_script.chapter_splitter import split_chapters
-from novel_to_script.llm_provider import MockProvider
+from novel_to_script.llm_provider import DeepSeekProvider, MockProvider
 from novel_to_script.assembler import assemble_script
+from novel_to_script.config import DEEPSEEK_API_KEY
 
 api_router = APIRouter(prefix="/api")
 
-# 内存中的任务状态存储（生产环境应使用 Redis 等）
+# 内存中的任务状态存储
 tasks: dict[str, dict] = {}
 
-# 默认 LLM Provider（后续可替换为真实 API）
-llm_provider = MockProvider()
+# 根据是否有 API Key 选择 Provider
+llm_provider = DeepSeekProvider() if DEEPSEEK_API_KEY else MockProvider()
 
 
 @api_router.post("/convert", response_model=ConvertResponse)
 async def start_conversion(request: ConvertRequest):
-    """提交小说文本，开始转换。
-
-    当前 MVP 版本为同步处理（使用 MockProvider），后续异步版本可用 GET /api/convert/{task_id} 轮询。
-    """
-    # 先分章节
+    """提交小说文本，开始转换。逐章调用 LLM，完成后返回完整剧本。"""
     chapters = split_chapters(request.text)
 
     if not chapters:
@@ -37,6 +34,7 @@ async def start_conversion(request: ConvertRequest):
     try:
         all_chars = []
         all_scenes = []
+        total = len(chapters)
 
         for i, (title, content) in enumerate(chapters):
             chars, scenes = await llm_provider.convert_chapter(title, content)

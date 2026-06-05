@@ -4,14 +4,23 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from novel_to_script.main import app
+from novel_to_script.llm_provider import MockProvider
 
 
 @pytest_asyncio.fixture
 async def client():
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
-        yield ac
+    """使用 MockProvider 的测试客户端，避免调用真实 API"""
+    import novel_to_script.router as router_module
+    # 保存原始 provider，测试期间替换为 MockProvider
+    original = router_module.llm_provider
+    router_module.llm_provider = MockProvider()
+    try:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as ac:
+            yield ac
+    finally:
+        router_module.llm_provider = original
 
 
 class TestHealthCheck:
