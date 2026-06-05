@@ -17,6 +17,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from novel_to_script.router import api_router
+app.include_router(api_router)
+
 
 @app.get("/api/health")
 async def health_check():
