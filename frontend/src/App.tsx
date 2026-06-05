@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import InputSection from './components/InputSection'
 import ChapterList from './components/ChapterList'
+import ProgressDisplay from './components/ProgressDisplay'
+import ResultPanel from './components/ResultPanel'
 import { submitConvert } from './api'
 import type { ConvertResponse } from './types'
 
@@ -43,10 +45,10 @@ function App() {
         )}
 
         {loading && (
-          <div className="mt-6 text-center">
-            <div className="inline-block text-2xl animate-spin">⏳</div>
-            <p className="text-gray-500 mt-2">正在转换中...</p>
-          </div>
+          <ProgressDisplay
+            progress={result?.progress || 0}
+            chapters={result?.chapters || []}
+          />
         )}
 
         {error && (
@@ -56,14 +58,7 @@ function App() {
         )}
 
         {result?.status === 'completed' && result.script && (
-          <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">
-              转换完成 ✅
-            </h2>
-            <pre className="bg-gray-900 text-green-400 p-4 rounded-lg text-sm overflow-auto max-h-96">
-              {JSON.stringify(result.script, null, 2)}
-            </pre>
-          </div>
+          <ResultPanel script={result.script} />
         )}
       </div>
     </div>
