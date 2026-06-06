@@ -81,42 +81,44 @@ async def delete_project(user_id: int, project_id: int) -> bool:
 async def add_revision(
     project_id: int, action: str, script_json: str = "",
     chapter_count: int = 0, scene_count: int = 0, chapter_names: str = "",
+    revision_id: int = 0,
 ) -> dict:
-    """记录一次生成/修改"""
+    """记录一次生成/修改。revision_id > 0 时更新已有记录而非新增。"""
     db = await get_db()
     try:
-        # 获取当前版本号
-        cur = await db.execute(
-            "SELECT COALESCE(MAX(version), 0) + 1 as v FROM revisions WHERE project_id = ?",
-            (project_id,),
-        )
-        row = await cur.fetchone()
-        version = row["v"]
+        if revision_id > 0:
+            # 更新已有记录
+            await db.execute(
+                "UPDATE revisions SET script_json = ?, scene_count = ?, chapter_count = ?, chapter_names = ?, action = ? WHERE id = ? AND project_id = ?",
+                (script_json, scene_count, chapter_count, chapter_names, action, revision_id, project_id),
+            )
+            await db.execute(
+                "UPDATE projects SET script_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (script_json, project_id),
+            )
+            await db.commit()
+            return {"ok": True, "revision_id": revision_id, "summary": ""}
+        else:
+            # 新增记录
+            cur = await db.execute(
+                "SELECT COALESCE(MAX(version), 0) + 1 as v FROM revisions WHERE project_id = ?",
+                (project_id,),
+            )
+            row = await cur.fetchone()
+            version = row["v"]
 
-        summary = f"第{version}版"
-        if chapter_count > 0:
-            summary += f" · {chapter_count}章"
-        if scene_count > 0:
-            summary += f" · {scene_count}场景"
+            summary = chapter_names if chapter_names else f"第{version}版"
 
-        await db.execute(
-            "INSERT INTO revisions (project_id, version, action, summary, script_json, chapter_count, scene_count, chapter_names) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (project_id, version, action, summary, script_json, chapter_count, scene_count, chapter_names),
-        )
-
-        # 同步更新 projects 表
-        if script_json:
-            import json
-            try:
-                s = json.loads(script_json)
-                scene_count = scene_count or len(s.get("scenes", []))
-            except:
-                pass
-        await db.execute(
-            "UPDATE projects SET script_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-            (script_json, project_id),
-        )
-        await db.commit()
+            cur2 = await db.execute(
+                "INSERT INTO revisions (project_id, version, action, summary, script_json, chapter_count, scene_count, chapter_names) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (project_id, version, action, summary, script_json, chapter_count, scene_count, chapter_names),
+            )
+            await db.execute(
+                "UPDATE projects SET script_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (script_json, project_id),
+            )
+            await db.commit()
+            return {"ok": True, "revision_id": cur2.lastrowid, "summary": summary}
         return {"ok": True, "version": version, "summary": summary}
     finally:
         await db.close()

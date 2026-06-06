@@ -424,6 +424,7 @@ async def api_add_revision(project_id: int, request: dict, req: Request):
         request.get("chapter_count", 0),
         request.get("scene_count", 0),
         request.get("chapter_names", ""),
+        request.get("revision_id", 0),
     )
     return r
 

@@ -26,7 +26,6 @@ export default function ProjectList({ onOpen, onOpenRevision, onNew, onLogout, u
     apiListProjects().then(setProjects).finally(() => setLoading(false))
   }, [])
 
-  // Preload revision counts
   useEffect(() => {
     for (const p of projects) {
       if (!revisions[p.id]) {
@@ -69,11 +68,8 @@ export default function ProjectList({ onOpen, onOpenRevision, onNew, onLogout, u
               return (
                 <div key={p.id}>
                   <div
-                    className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors border ${
-                      expandedId === p.id
-                        ? 'bg-indigo-50 border-indigo-200'
-                        : 'bg-gray-50 border-transparent hover:bg-indigo-50'
-                    }`}
+                    className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors border ${expandedId === p.id ? 'bg-indigo-50 border-indigo-200' : 'bg-gray-50 border-transparent hover:bg-indigo-50'
+                      }`}
                     onClick={() => toggleExpand(p.id)}
                   >
                     <div>
@@ -99,7 +95,6 @@ export default function ProjectList({ onOpen, onOpenRevision, onNew, onLogout, u
                     </div>
                   </div>
 
-                  {/* 展开提示 */}
                   {expandedId !== p.id && hasRevisions && (
                     <div className="text-xs text-gray-400 text-center py-1">
                       👆 点击展开查看 {revs.length} 个历史版本
@@ -111,33 +106,29 @@ export default function ProjectList({ onOpen, onOpenRevision, onNew, onLogout, u
                     </div>
                   )}
 
-                  {/* 展开的历史记录 */}
                   {expandedId === p.id && (
                     <div className="ml-2 mt-1 mb-2 border-l-2 border-indigo-200 pl-4 space-y-1">
                       <div className="text-xs text-gray-400 mb-2">
-                        {hasRevisions
-                          ? `📋 历史版本（点击查看）`
-                          : '暂无转换记录'}
+                        {hasRevisions ? '📋 历史版本（点击查看）' : '暂无转换记录'}
                       </div>
                       {revs.slice(0, 10).map((r: any) => (
                         <div
                           key={r.id}
-                          className="text-xs text-gray-500 py-1.5 px-2 rounded hover:bg-indigo-50 cursor-pointer transition-colors flex items-start gap-3"
+                          className="text-xs py-1.5 px-2 rounded hover:bg-indigo-50 cursor-pointer transition-colors flex items-start gap-3"
                           onClick={(e) => { e.stopPropagation(); onOpenRevision(p.id, p.name, r.id) }}
                         >
-                          <span className="text-gray-300 shrink-0">{r.created_at?.slice(0, 10)}</span>
+                          <span className="text-gray-300 shrink-0 mt-0.5">{r.created_at?.slice(5, 10)}</span>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-gray-700">{r.summary || `版本 ${r.version}`}</span>
-                              <span className="text-gray-400">{r.action}</span>
+                            <div className="font-medium text-gray-800 truncate">
+                              📖 {r.summary || `版本 ${r.version}`}
                             </div>
-                            {r.chapter_names && (
-                              <div className="text-gray-400 mt-0.5 truncate">
-                                📖 {r.chapter_names}
-                              </div>
-                            )}
+                            <div className="flex items-center gap-2 mt-0.5 text-gray-400">
+                              {r.chapter_count > 0 && <span>{r.chapter_count}章</span>}
+                              {r.scene_count > 0 && <span>{r.scene_count}场景</span>}
+                              <span>{r.action}</span>
+                            </div>
                           </div>
-                          <span className="text-indigo-400 text-[10px] shrink-0">查看 →</span>
+                          <span className="text-indigo-400 text-[10px] shrink-0 mt-0.5">查看 →</span>
                         </div>
                       ))}
                       {revs.length > 10 && (

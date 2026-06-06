@@ -20,6 +20,7 @@ function App() {
   const [view, setView] = useState<'projects' | 'editor'>('projects')
   const [projectId, setProjectId] = useState<number | null>(null)
   const [projectName, setProjectName] = useState('')
+  const currentRevisionId = useRef(0)    // 当前会话的版本ID, 修改时更新同一条
   const [authChecked, setAuthChecked] = useState(false)
 
   // Validate token on mount
@@ -46,6 +47,7 @@ function App() {
     const result = await apiCreateProject(name)
     if (result.ok) {
       setProjectId(result.project_id); setProjectName(name)
+      currentRevisionId.current = 0
       setStage('input'); setResult(null); setError(null)
       setChapters([]); setFullText(''); setDisplayProgress(0)
       setView('editor')
@@ -54,6 +56,7 @@ function App() {
 
   const handleOpenProject = async (id: number, name: string) => {
     setProjectId(id); setProjectName(name)
+    currentRevisionId.current = 0   // 新会话，新版本
     setStage('input'); setResult(null); setError(null)
     setChapters([]); setFullText(''); setDisplayProgress(0); setPhaseLabel('')
     clearAnim(); stopPolling()
@@ -104,7 +107,9 @@ function App() {
       const chapterCount = result.chapters?.length || 0
       apiSaveProject(projectId, fullText, json).catch(() => {})
       const chapterNames = (result.chapters || []).join(', ')
-      apiAddRevision(projectId, 'AI 生成', json, chapterCount, sceneCount, chapterNames).catch(() => {})
+      apiAddRevision(projectId, 'AI 生成', json, chapterCount, sceneCount, chapterNames, currentRevisionId.current)
+        .then((r) => { if (r.revision_id) currentRevisionId.current = r.revision_id })
+        .catch(() => {})
     }
     isViewingHistory.current = false  // reset after handling
   }, [result?.status])
