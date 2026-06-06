@@ -9,6 +9,7 @@ from novel_to_script.models import (
     ActionElement, DialogueElement, TransitionElement,
 )
 from novel_to_script.config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
+from novel_to_script.assembler import merge_chapter_result
 
 FULL_NOVEL_PROMPT = """You are a professional script adaptation assistant. Convert the following novel into a structured screenplay in YAML-compatible JSON format.
 
@@ -156,19 +157,53 @@ class DeepSeekProvider:
     async def convert_novel(
         self, chapters: list[tuple[str, str]], outline: dict | None = None
     ) -> tuple[list[Character], list[Scene]]:
-        """Convert entire novel at once — one API call for all chapters."""
-        # Build a single message with all chapters
+        """Convert entire novel — batch chapters if needed."""
+        BATCH_SIZE = 8
+        if len(chapters) <= BATCH_SIZE:
+            return await self._convert_batch(chapters, outline, None)
+
+        # Batch processing: send batches of chapters, accumulate characters
+        all_chars: list[Character] = []
+        all_scenes: list[Scene] = []
+        existing_characters: list[dict] = []
+        scene_offset = 0
+
+        for batch_start in range(0, len(chapters), BATCH_SIZE):
+            batch = chapters[batch_start:batch_start + BATCH_SIZE]
+            chars, scenes = await self._convert_batch(
+                batch, outline, existing_characters if existing_characters else None
+            )
+            # Merge characters by name
+            merged_chars, scenes = merge_chapter_result(
+                all_chars, chars, scenes
+            )
+            all_chars = merged_chars
+            all_scenes.extend(scenes)
+
+        return all_chars, all_scenes
+
+    async def _convert_batch(
+        self,
+        chapters: list[tuple[str, str]],
+        outline: dict | None,
+        existing_characters: list[dict] | None,
+    ) -> tuple[list[Character], list[Scene]]:
+        """Convert a batch of chapters."""
         parts = []
+        if existing_characters:
+            parts.append("## Previously Identified Characters (keep their IDs)\n")
+            parts.append(json.dumps(existing_characters, ensure_ascii=False, indent=2))
+            parts.append("\n---\n")
+
         for title, content in chapters:
             parts.append(f"## {title}\n\n{content}")
         full_text = "\n\n---\n\n".join(parts)
 
-        # If user provided outline, include it as guidance
         outline_guide = ""
         if outline:
             outline_guide = "\n\n## Scene Outline (FOLLOW THIS STRUCTURE)\n\n"
             outline_guide += json.dumps(outline, ensure_ascii=False, indent=2)
-            outline_guide += "\n\nFollow this scene breakdown exactly. Use the specified locations, times, characters, and scene flow."
+            outline_guide += "\n\nFollow this scene breakdown."
 
         user_msg = full_text + outline_guide
 

@@ -48,7 +48,8 @@ class TestConvert:
     @pytest.mark.asyncio
     async def test_convert_with_chapters(self, client):
         """提交含3章文本 → 立即返回 processing → 轮询后完成"""
-        text = "第1章 测试\n这是测试内容。\n第2章 继续\n更多内容。\n第3章 结尾\n结束。"
+        pad = "X" * 120
+        text = f"第1章 测试\n{pad}\n第2章 继续\n{pad}\n第3章 结尾\n{pad}"
 
         response = await client.post(
             "/api/convert",
