@@ -20,7 +20,7 @@ tasks: dict[str, dict] = {}
 llm_provider = DeepSeekProvider() if DEEPSEEK_API_KEY else MockProvider()
 
 
-async def _process_conversion(task_id: str, text: str):
+async def _process_conversion(task_id: str, text: str, outline: dict | None = None):
     """Background task: single LLM call for entire novel, then assemble."""
     try:
         chapters = split_chapters(text)
@@ -29,7 +29,7 @@ async def _process_conversion(task_id: str, text: str):
         tasks[task_id]["status"] = "processing"
         tasks[task_id]["progress"] = 5
 
-        all_chars, all_scenes = await llm_provider.convert_novel(chapters)
+        all_chars, all_scenes = await llm_provider.convert_novel(chapters, outline)
 
         meta = Meta(
             title=f"{chapter_titles[0] if chapter_titles else 'Untitled'} Script",
@@ -69,7 +69,7 @@ async def start_conversion(request: ConvertRequest):
         "error": None,
     }
 
-    asyncio.create_task(_process_conversion(task_id, request.text))
+    asyncio.create_task(_process_conversion(task_id, request.text, request.outline))
 
     return ConvertResponse(
         task_id=task_id,

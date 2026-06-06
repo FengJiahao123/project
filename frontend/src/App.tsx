@@ -85,7 +85,7 @@ function App() {
     await handleSubmit(text)
   }
 
-  const handleConfirmOutlineWrapper = async () => {
+  const handleConfirmOutlineWrapper = async (editedOutline: OutlineResponse) => {
     if (!pendingText) return
     setStage('generating')
     setDisplayProgress(0)
@@ -93,7 +93,7 @@ function App() {
     startAnimation()
 
     try {
-      const initial = await submitConvert(pendingText)
+      const initial = await submitConvert(pendingText, editedOutline)
       setResult(initial)
       if (initial.task_id) {
         startPolling(initial.task_id)

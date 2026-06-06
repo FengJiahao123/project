@@ -2,11 +2,11 @@ import type { ConvertResponse, RevisionResponse, OutlineResponse, Script } from 
 
 const BASE = '/api'
 
-export async function submitConvert(text: string): Promise<ConvertResponse> {
+export async function submitConvert(text: string, outline?: OutlineResponse): Promise<ConvertResponse> {
   const resp = await fetch(`${BASE}/convert`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({ text, outline: outline || null }),
   })
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({ detail: resp.statusText }))

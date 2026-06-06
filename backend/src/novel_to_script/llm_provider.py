@@ -67,12 +67,13 @@ class LLMProvider(Protocol):
         ...
 
     async def convert_novel(
-        self, chapters: list[tuple[str, str]]
+        self, chapters: list[tuple[str, str]], outline: dict | None = None
     ) -> tuple[list[Character], list[Scene]]:
         """Convert ALL chapters at once to complete character and scene lists.
 
         Args:
             chapters: List of (chapter_title, chapter_text) tuples
+            outline: Optional user-edited outline for guidance
 
         Returns:
             (complete character list, complete scene list)
@@ -108,7 +109,7 @@ class MockProvider:
         return characters, [scene]
 
     async def convert_novel(
-        self, chapters: list[tuple[str, str]]
+        self, chapters: list[tuple[str, str]], outline: dict | None = None
     ) -> tuple[list[Character], list[Scene]]:
         """Generate mock script data for all chapters at once"""
         chars: list[Character] = []
@@ -153,7 +154,7 @@ class DeepSeekProvider:
         return characters, scenes
 
     async def convert_novel(
-        self, chapters: list[tuple[str, str]]
+        self, chapters: list[tuple[str, str]], outline: dict | None = None
     ) -> tuple[list[Character], list[Scene]]:
         """Convert entire novel at once — one API call for all chapters."""
         # Build a single message with all chapters
@@ -162,11 +163,20 @@ class DeepSeekProvider:
             parts.append(f"## {title}\n\n{content}")
         full_text = "\n\n---\n\n".join(parts)
 
+        # If user provided outline, include it as guidance
+        outline_guide = ""
+        if outline:
+            outline_guide = "\n\n## Scene Outline (FOLLOW THIS STRUCTURE)\n\n"
+            outline_guide += json.dumps(outline, ensure_ascii=False, indent=2)
+            outline_guide += "\n\nFollow this scene breakdown exactly. Use the specified locations, times, characters, and scene flow."
+
+        user_msg = full_text + outline_guide
+
         response = await self._client.chat.completions.create(
             model=self._model,
             messages=[
                 {"role": "system", "content": FULL_NOVEL_PROMPT},
-                {"role": "user", "content": full_text},
+                {"role": "user", "content": user_msg},
             ],
             temperature=0.7,
             max_tokens=16384,
