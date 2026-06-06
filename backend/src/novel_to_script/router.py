@@ -9,7 +9,7 @@ from novel_to_script.models import (
 )
 from novel_to_script.chapter_splitter import split_chapters
 from novel_to_script.llm_provider import DeepSeekProvider, MockProvider
-from novel_to_script.assembler import assemble_script
+from novel_to_script.assembler import assemble_script, merge_chapter_result
 from novel_to_script.config import DEEPSEEK_API_KEY
 
 api_router = APIRouter(prefix="/api")
@@ -38,7 +38,7 @@ async def start_conversion(request: ConvertRequest):
 
         for i, (title, content) in enumerate(chapters):
             chars, scenes = await llm_provider.convert_chapter(title, content)
-            all_chars.extend(chars)
+            all_chars, scenes = merge_chapter_result(all_chars, chars, scenes)
             all_scenes.extend(scenes)
 
         meta = Meta(

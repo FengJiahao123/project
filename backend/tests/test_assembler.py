@@ -1,10 +1,134 @@
 """测试剧本组装器"""
 
 import pytest
-from novel_to_script.assembler import assemble_script, to_yaml
+from novel_to_script.assembler import assemble_script, to_yaml, merge_chapter_result
 from novel_to_script.models import (
-    Meta, Character, Scene, Location, ActionElement, Script
+    Meta, Character, Scene, Location, ActionElement, DialogueElement, Script
 )
+
+
+class TestMergeChapterResult:
+    def test_new_character_gets_sequential_id(self):
+        """已有角色 char_001, char_002，新角色应分配 char_003"""
+        existing = [
+            Character(id="char_001", name="张三", role="主角", description="..."),
+            Character(id="char_002", name="李四", role="配角", description="..."),
+        ]
+        new_chars = [
+            Character(id="char_001", name="王五", role="龙套", description="新角色"),
+        ]
+        new_scenes: list[Scene] = []
+
+        merged, scenes = merge_chapter_result(existing, new_chars, new_scenes)
+        assert len(merged) == 3
+        assert merged[2].id == "char_003"
+        assert merged[2].name == "王五"
+
+    def test_existing_character_reuses_id(self):
+        """名称匹配的已有角色 → 复用已有 ID，不新增"""
+        existing = [
+            Character(id="char_001", name="陈平安", role="主角", description="少年"),
+        ]
+        new_chars = [
+            Character(id="char_001", name="陈平安", role="主角", description="同一人"),
+            Character(id="char_002", name="宁姚", role="主角", description="少女"),
+        ]
+        new_scenes: list[Scene] = []
+
+        merged, scenes = merge_chapter_result(existing, new_chars, new_scenes)
+        # 陈平安 复用已有 ID，宁姚 新分配 → 共 2 个
+        assert len(merged) == 2
+        assert merged[0].id == "char_001"
+        assert merged[0].name == "陈平安"
+        assert merged[1].name == "宁姚"
+        assert merged[1].id == "char_002"
+
+    def test_scene_references_remapped(self):
+        """场景中 characters_present 和 dialogue.speaker 的 ID 应被更新"""
+        existing = [
+            Character(id="char_001", name="张三", role="主角", description="..."),
+        ]
+        new_chars = [
+            Character(id="char_001", name="张三", role="主角", description="..."),
+            Character(id="char_002", name="李四", role="配角", description="..."),
+        ]
+        # 李四在新章节中 ID 为 char_002，但这是第一次出现
+        new_scenes = [
+            Scene(
+                scene_number=1,
+                location=Location(name="某地", time="昼", description=""),
+                characters_present=["char_002"],  # 旧 ID → 应映射为 char_002（恰好不变）
+                elements=[
+                    DialogueElement(
+                        type="dialogue",
+                        speaker="char_001",  # 旧 ID → 应映射为 char_001
+                        lines=["你好"],
+                    ),
+                ],
+            ),
+        ]
+
+        merged, scenes = merge_chapter_result(existing, new_chars, new_scenes)
+        # 张三 char_001（复用），李四 → char_002（新分配）
+        assert len(merged) == 2
+        # 场景引用应正确
+        assert scenes[0].characters_present == ["char_002"]
+        assert scenes[0].elements[0].speaker == "char_001"
+
+    def test_cross_chapter_collision_resolved(self):
+        """模拟真实跨章碰撞：ch1 char_002=刘羡阳, ch3 char_002=宁姚"""
+        # ch1 后的已累积角色
+        existing = [
+            Character(id="char_001", name="陈平安", role="主角", description="..."),
+            Character(id="char_002", name="刘羡阳", role="配角", description="..."),
+        ]
+        # ch3 LLM 返回的角色（宁姚被标为 char_002，冲突！）
+        new_chars = [
+            Character(id="char_001", name="陈平安", role="主角", description="..."),
+            Character(id="char_002", name="宁姚", role="主角", description="青衣少女"),
+        ]
+        new_scenes = [
+            Scene(
+                scene_number=1,
+                location=Location(name="客栈", time="昼", description=""),
+                characters_present=["char_001", "char_002"],
+                elements=[
+                    DialogueElement(
+                        type="dialogue",
+                        speaker="char_002",
+                        lines=["我叫宁姚。"],
+                    ),
+                ],
+            ),
+        ]
+
+        merged, scenes = merge_chapter_result(existing, new_chars, new_scenes)
+
+        # 陈平安 → char_001（复用），宁姚 → char_003（新分配，不是 char_002！）
+        assert len(merged) == 3
+        assert merged[0].id == "char_001"  # 陈平安
+        assert merged[1].id == "char_002"  # 刘羡阳（保持）
+        assert merged[2].id == "char_003"  # 宁姚（新 ID！）
+        assert merged[2].name == "宁姚"
+
+        # 场景引用应指向新 ID char_003
+        assert scenes[0].characters_present == ["char_001", "char_003"]
+        assert scenes[0].elements[0].type == "dialogue"
+        assert scenes[0].elements[0].speaker == "char_003"
+
+    def test_name_whitespace_normalized(self):
+        """角色名前后空白不影响匹配"""
+        existing = [
+            Character(id="char_001", name="陈平安", role="主角", description="..."),
+        ]
+        new_chars = [
+            Character(id="char_001", name="  陈平安  ", role="主角", description="..."),
+        ]
+        merged, _ = merge_chapter_result(existing, new_chars, [])
+        assert len(merged) == 1  # 视为同一角色
+
+
+
 
 
 class TestAssembleScript:
