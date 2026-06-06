@@ -55,9 +55,6 @@ export default function ProjectList({ onOpen, onOpenRevision, onNew, onLogout, u
                     <p className="text-[11px] text-warm-gray-light mt-0.5">创作工坊 · 个人账户</p>
                   </div>
                   <div className="py-1">
-                    <button className="dropdown-item" onClick={() => { setUserMenuOpen(false) }}>
-                      <Icon name="settings" size={14} /><span>个人设置</span>
-                    </button>
                     <button className="dropdown-item" onClick={() => { setUserMenuOpen(false); onLogout() }}>
                       <Icon name="logOut" size={14} /><span>退出登录</span>
                     </button>

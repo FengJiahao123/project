@@ -347,6 +347,35 @@ function App() {
         </div>
       )}
 
+      {/* ===== API Key Banner — prominent when not set ===== */}
+      {!apiKeySet && (
+        <div className="bg-amber-50 border-b border-amber-200">
+          <div className="max-w-4xl mx-auto px-6 py-3 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                <Icon name="key" size={16} className="text-amber-700" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-amber-800">需要设置 API Key 才能使用 AI 转换</p>
+                <p className="text-xs text-amber-600">输入 DeepSeek API Key，Key 仅保存在当前会话</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                className="text-xs px-3 py-2 border border-amber-300 rounded-lg w-72 font-mono outline-none focus:border-amber-500 bg-white"
+                type="password" placeholder="sk-..." value={apiKey}
+                onChange={(e) => setApiKeyState(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSetKey() }}
+              />
+              <button onClick={handleSetKey} disabled={!apiKey.trim()}
+                className="px-4 py-2 bg-amber-600 text-white text-xs font-medium rounded-lg hover:bg-amber-700 disabled:opacity-50 transition-colors whitespace-nowrap">
+                保存
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ==== Main Content ==== */}
       <div className="max-w-3xl mx-auto py-8 px-4">
         {/* Step indicator */}
