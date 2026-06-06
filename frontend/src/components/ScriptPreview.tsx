@@ -245,26 +245,24 @@ export default function ScriptPreview({ script, onScriptUpdate }: Props) {
 
       {/* Toolbar */}
       <div className="flex items-center justify-between mb-3">
-        <h4 className="text-sm font-medium text-gray-600">
-          📜 剧本预览 {editable && <span className="text-[10px] text-gray-400 ml-1">（点击任意内容即可编辑）</span>}
-          {revisionCount > 0 && <span className="ml-2 text-xs text-indigo-600">已修改 {revisionCount} 次</span>}
+        <h4 className="text-xs text-warm-gray">
+          剧本预览 {editable && <span className="text-warm-gray-light ml-1">（点击内容即可编辑）</span>}
+          {revisionCount > 0 && <span className="ml-2 text-ink/60">已修改 {revisionCount} 次</span>}
         </h4>
         <div className="flex items-center gap-2">
-          <button onClick={() => setDarkMode(!darkMode)} title={darkMode ? '切换到亮色模式' : '切换到暗色模式'}
-            className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${darkMode ? 'bg-gray-700 text-yellow-400 border-gray-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}>
-            {darkMode ? '☀️ 亮色' : '🌙 暗色'}
+          <button onClick={() => setDarkMode(!darkMode)} title={darkMode ? '切换亮色' : '切换暗色'}
+            className={`text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${darkMode ? 'bg-ink text-white border-ink' : 'bg-white text-warm-gray border-border hover:border-warm-gray-light'}`}>
+            {darkMode ? '亮色' : '暗色'}
           </button>
           <button onClick={handlePrint} title="打印或导出为 PDF"
-            className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
-            📥 打印
-          </button>
+            className="text-xs px-2.5 py-1.5 bg-ink text-white rounded-lg hover:bg-accent-hover transition-colors">打印</button>
           <button onClick={handleCopy} title="复制纯文本剧本到剪贴板"
-            className="text-xs px-3 py-1.5 bg-white text-gray-600 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors">
-            {copied ? '✅ 已复制' : '📋 复制'}
+            className="text-xs px-2.5 py-1.5 bg-white text-warm-gray rounded-lg border border-border hover:border-warm-gray-light transition-colors">
+            {copied ? '已复制' : '复制'}
           </button>
           <button onClick={() => setChatOpen(!chatOpen)} title="用 AI 自然语言修改剧本"
-            className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${chatOpen ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}>
-            💬 AI 协作
+            className={`text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${chatOpen ? 'bg-ink text-white border-ink' : 'bg-white text-warm-gray border-border hover:border-warm-gray-light'}`}>
+            AI 协作
           </button>
         </div>
       </div>

@@ -1,1 +1,95 @@
 @import "tailwindcss";
+
+@theme {
+  --color-cream: #faf8f5;
+  --color-ivory: #fefdfb;
+  --color-warm-white: #fefefe;
+  --color-ink: #1e1b18;
+  --color-warm-gray: #78716c;
+  --color-warm-gray-light: #a8a29e;
+  --color-border: #e7e0d8;
+  --color-border-light: #f0ebe3;
+  --color-accent: #1e1b18;
+  --color-accent-hover: #3d3833;
+  --color-soft-amber: #f5f0e8;
+  --color-merlot: #8b4513;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  background-color: var(--color-cream);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-serif {
+  font-family: Georgia, "Noto Serif SC", "SimSun", "Songti SC", serif;
+}
+
+/* Input underline style */
+.input-underline {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 0;
+  padding: 0.75rem 0.25rem;
+  transition: border-color 0.15s;
+  outline: none;
+  width: 100%;
+  font-size: 0.9375rem;
+}
+.input-underline:focus {
+  border-bottom-color: var(--color-ink);
+}
+
+/* Card style */
+.card-warm {
+  background: var(--color-ivory);
+  border: 1px solid var(--color-border);
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+/* Button primary */
+.btn-primary {
+  background: var(--color-ink);
+  color: white;
+  border: none;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1.5rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-primary:hover {
+  background: var(--color-accent-hover);
+}
+.btn-primary:disabled {
+  background: #d6d3d1;
+  cursor: not-allowed;
+}
+
+/* Button ghost */
+.btn-ghost {
+  background: transparent;
+  color: var(--color-warm-gray);
+  border: none;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  transition: color 0.15s;
+}
+.btn-ghost:hover {
+  color: var(--color-ink);
+}
+
+/* Link */
+.link {
+  color: var(--color-warm-gray);
+  text-decoration: none;
+  font-size: 0.8125rem;
+  transition: color 0.15s;
+}
+.link:hover {
+  color: var(--color-ink);
+}

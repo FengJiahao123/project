@@ -51,29 +51,27 @@ export default function ResultPanel({ script: initialScript }: Props) {
     .filter((e) => e.type === 'dialogue').length
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mt-6">
+    <div className="card-warm p-6 mt-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-800">转换结果</h2>
+        <h2 className="font-serif text-lg font-bold text-ink">转换结果</h2>
         <button
           onClick={handleDownload}
-          className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium
-                     hover:bg-green-700 transition-colors"
-        >
-          📥 下载 YAML
-        </button>
+          className="text-xs px-3 py-1.5 border border-border rounded-lg text-warm-gray
+                     hover:text-ink hover:border-warm-gray-light transition-colors"
+        >下载 YAML</button>
       </div>
 
       {/* Tab 切换 */}
-      <div className="flex gap-1 border-b border-gray-200 mb-4">
+      <div className="flex gap-1 border-b border-border mb-4">
         {tabs.map(({ key, label }) => (
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px
+            className={`px-3 py-2 text-xs transition-colors border-b-2 -mb-px
               ${
                 tab === key
-                  ? 'border-indigo-600 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'border-ink text-ink font-medium'
+                  : 'border-transparent text-warm-gray-light hover:text-ink'
               }`}
           >
             {label}
@@ -87,17 +85,17 @@ export default function ResultPanel({ script: initialScript }: Props) {
       {tab === 'characters' && (
         <div className="grid gap-3 sm:grid-cols-2">
           {script.characters.map((c) => (
-            <div key={c.id} className="p-4 bg-gray-50 rounded-lg">
+            <div key={c.id} className="p-3 bg-soft-amber/40 rounded-lg">
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-gray-800">{c.name}</span>
+                <span className="font-medium text-ink text-sm">{c.name}</span>
                 <span
-                  className={`text-xs px-2 py-0.5 rounded-full
+                  className={`text-[10px] px-1.5 py-0.5 rounded-full
                   ${
                     c.role === '主角'
-                      ? 'bg-amber-100 text-amber-700'
+                      ? 'bg-ink text-white'
                       : c.role === '配角'
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'bg-gray-200 text-gray-600'
+                        ? 'bg-soft-amber text-warm-gray'
+                        : 'bg-border text-warm-gray-light'
                   }`}
                 >
                   {c.role}
@@ -153,9 +151,9 @@ export default function ResultPanel({ script: initialScript }: Props) {
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="text-center p-4 bg-gray-50 rounded-lg">
-      <div className="text-2xl font-bold text-indigo-600">{value}</div>
-      <div className="text-sm text-gray-500">{label}</div>
+    <div className="text-center p-4 bg-soft-amber/40 rounded-lg">
+      <div className="text-xl font-bold text-ink font-serif">{value}</div>
+      <div className="text-xs text-warm-gray mt-0.5">{label}</div>
     </div>
   )
 }

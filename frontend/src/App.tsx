@@ -261,94 +261,91 @@ function App() {
   }, [stopPolling, clearAnim])
 
   // ====== Auth gate ======
-  if (!authChecked) return <div className="min-h-screen bg-gray-50 flex items-center justify-center"><p className="text-gray-400">加载中...</p></div>
+  if (!authChecked) return <div className="min-h-screen flex items-center justify-center" style={{background:'#faf8f5'}}><p className="text-sm text-warm-gray">加载中...</p></div>
   if (!token) return <AuthPage onLogin={handleLogin} />
   if (view === 'projects') {
     return <ProjectList onOpen={handleOpenProject} onOpenRevision={handleOpenRevision} onNew={handleNewProject} onLogout={handleLogout} username={username} />
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto py-8 px-4">
-        <header className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-indigo-700 mb-2">
-            🎬 AI 小说转剧本工具
-          </h1>
-          <p className="text-gray-500">
-            {projectName} | <button onClick={handleBackToProjects} className="text-indigo-600 hover:text-indigo-800">返回项目列表</button>
-          </p>
-        </header>
-
-        {/* API Key */}
-        <div className="mb-4 flex items-center justify-center">
-          {apiKeySet ? (
-            <div className="flex items-center gap-2 text-xs text-green-600 bg-green-50 px-3 py-1.5 rounded-full">
-              ✅ API Key 已设置
-              <button
-                onClick={() => setShowKeyInput(true)}
-                className="text-gray-400 hover:text-gray-600 ml-1"
-              >（更换）</button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 px-4 py-2 rounded-lg">
-              <span className="text-xs text-amber-700 font-medium">⚠️ 请设置 DeepSeek API Key：</span>
-              <input
-                className="text-xs px-2 py-1 border border-gray-300 rounded w-64 font-mono"
-                type="password" placeholder="sk-..." value={apiKey}
-                onChange={(e) => setApiKeyState(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleSetKey() }}
-              />
-              <button onClick={handleSetKey} disabled={!apiKey.trim()}
-                className="text-xs px-3 py-1 bg-amber-600 text-white rounded hover:bg-amber-700 disabled:bg-gray-300 transition-colors">保存</button>
-            </div>
-          )}
-          {showKeyInput && apiKeySet && (
-            <div className="flex items-center gap-2 ml-2">
-              <input
-                className="text-xs px-2 py-1 border border-gray-300 rounded w-48 font-mono" type="password"
-                placeholder="输入新 Key..." value={apiKey}
-                onChange={(e) => setApiKeyState(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleSetKey() }}
-              />
-              <button onClick={handleSetKey} disabled={!apiKey.trim()}
-                className="text-xs px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:bg-gray-300">确认</button>
-              <button onClick={() => setShowKeyInput(false)}
-                className="text-xs text-gray-400 hover:text-gray-600">取消</button>
-            </div>
-          )}
+    <div className="min-h-screen" style={{background: 'linear-gradient(180deg, #faf8f5 0%, #f5f0e8 100%)'}}>
+      <div className="max-w-3xl mx-auto py-10 px-4">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <button onClick={handleBackToProjects} className="text-xs text-warm-gray-light hover:text-ink transition-colors mb-2 block">
+              ← 返回项目列表
+            </button>
+            <h1 className="font-serif text-2xl font-bold text-ink">{projectName}</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            {apiKeySet ? (
+              <span className="text-xs text-warm-gray-light bg-soft-amber px-2.5 py-1 rounded-full">Key 已设置</span>
+            ) : (
+              <button onClick={() => setShowKeyInput(true)} className="text-xs text-warm-gray-light hover:text-ink underline">
+                设置 API Key
+              </button>
+            )}
+          </div>
         </div>
+
+        {/* API Key input (collapsed) */}
+        {showKeyInput && !apiKeySet && (
+          <div className="card-warm p-4 mb-4 flex items-center gap-3">
+            <span className="text-xs text-warm-gray shrink-0">DeepSeek API Key：</span>
+            <input className="flex-1 text-xs px-3 py-1.5 border border-border rounded outline-none focus:border-warm-gray-light font-mono"
+              type="password" placeholder="sk-..." value={apiKey}
+              onChange={(e) => setApiKeyState(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSetKey() }}
+            />
+            <button onClick={handleSetKey} disabled={!apiKey.trim()}
+              className="text-xs px-3 py-1.5 bg-ink text-white rounded hover:bg-accent-hover disabled:opacity-50 transition-colors">保存</button>
+            <button onClick={() => setShowKeyInput(false)} className="text-xs text-warm-gray-light hover:text-ink">取消</button>
+          </div>
+        )}
+
+        {showKeyInput && apiKeySet && (
+          <div className="card-warm p-4 mb-4 flex items-center gap-3">
+            <span className="text-xs text-warm-gray">更换 Key：</span>
+            <input className="flex-1 text-xs px-3 py-1.5 border border-border rounded outline-none focus:border-warm-gray-light font-mono"
+              type="password" placeholder="sk-..." value={apiKey}
+              onChange={(e) => setApiKeyState(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSetKey() }}
+            />
+            <button onClick={handleSetKey} disabled={!apiKey.trim()}
+              className="text-xs px-3 py-1.5 bg-ink text-white rounded hover:bg-accent-hover disabled:opacity-50 transition-colors">保存</button>
+            <button onClick={() => { setShowKeyInput(false); setApiKeyState('') }} className="text-xs text-warm-gray-light hover:text-ink">取消</button>
+          </div>
+        )}
 
         <InputSection onSubmit={handleDetect} disabled={stage === 'generating' || detectLoading} />
 
         {detectLoading && (
-          <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-center">
-            <div className="text-2xl animate-spin mb-3">🔍</div>
-            <p className="text-gray-600 font-medium">正在检测章节...</p>
+          <div className="card-warm p-6 mt-6 text-center">
+            <p className="text-sm text-warm-gray">正在检测章节...</p>
           </div>
         )}
 
         {stage === 'chapterSelect' && chapters.length > 0 && (
-          <ChapterSelector
-            chapters={chapters} onSubmit={handleStartConvert}
-            onCancel={() => { setStage('input'); setChapters([]) }}
-          />
+          <ChapterSelector chapters={chapters} onSubmit={handleStartConvert}
+            onCancel={() => { setStage('input'); setChapters([]) }} />
         )}
 
         {stage === 'generating' && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mt-6">
+          <div className="card-warm p-6 mt-6">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-medium text-gray-700">{phaseLabel || '🔄 准备中...'}</h3>
-              <span className="text-sm font-mono text-indigo-600">{Math.round(displayProgress)}%</span>
+              <h3 className="text-sm text-warm-gray">{phaseLabel || '准备中...'}</h3>
+              <span className="text-sm font-mono text-ink/60">{Math.round(displayProgress)}%</span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2.5">
-              <div className="bg-indigo-600 h-2.5 rounded-full transition-all duration-300 ease-linear"
+            <div className="w-full bg-soft-amber rounded-full h-1.5">
+              <div className="bg-ink h-1.5 rounded-full transition-all duration-300 ease-linear"
                 style={{ width: `${displayProgress}%` }} />
             </div>
           </div>
         )}
 
         {error && (
-          <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">❌ {error}</div>
+          <div className="card-warm p-4 mt-6 text-sm text-merlot">{error}</div>
         )}
 
         {stage === 'done' && result?.script && (

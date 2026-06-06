@@ -26,59 +26,80 @@ export default function AuthPage({ onLogin }: Props) {
       } else {
         setError(result.message)
       }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '请求失败')
+    } catch {
+      setError('网络错误，请稍后重试')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-sm">
-        <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold text-indigo-700">🎬 AI 小说转剧本</h1>
-          <p className="text-sm text-gray-400 mt-1">
-            {mode === 'login' ? '登录以继续' : '创建新账户'}
+    <div className="min-h-screen flex items-center justify-center px-4"
+      style={{ background: 'linear-gradient(180deg, #faf8f5 0%, #f5f0e8 100%)' }}>
+      <div className="w-full max-w-sm">
+        {/* Header */}
+        <div className="text-center mb-10">
+          <h1 className="font-serif text-3xl font-bold text-ink tracking-wide mb-3">
+            小说转剧本工坊
+          </h1>
+          <p className="text-sm text-warm-gray leading-relaxed">
+            {mode === 'login' ? '将文字编成光影，让故事登上舞台' : '创建你的创作空间'}
           </p>
         </div>
 
-        <input
-          className="w-full p-3 border border-gray-300 rounded-lg text-sm mb-3 focus:ring-2 focus:ring-indigo-500"
-          placeholder="用户名"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit() }}
-        />
-        <input
-          className="w-full p-3 border border-gray-300 rounded-lg text-sm mb-4 focus:ring-2 focus:ring-indigo-500"
-          type="password"
-          placeholder="密码"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit() }}
-        />
+        {/* Card */}
+        <div className="card-warm p-8">
+          <div className="space-y-5">
+            <div>
+              <label className="text-xs text-warm-gray mb-1 block">用户名</label>
+              <input
+                className="input-underline"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit() }}
+                placeholder="输入用户名"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-warm-gray mb-1 block">密码</label>
+              <input
+                className="input-underline"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit() }}
+                placeholder="输入密码"
+              />
+            </div>
+          </div>
 
-        {error && (
-          <p className="text-sm text-red-500 mb-3">{error}</p>
-        )}
+          {error && (
+            <p className="text-xs text-red-500 mt-4">{error}</p>
+          )}
 
-        <button
-          onClick={handleSubmit}
-          disabled={loading || !username.trim() || !password.trim()}
-          className="w-full py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:bg-gray-300 transition-colors"
-        >
-          {loading ? '...' : mode === 'login' ? '登录' : '注册'}
-        </button>
-
-        <p className="text-xs text-center mt-4 text-gray-400">
-          {mode === 'login' ? '没有账户？' : '已有账户？'}
           <button
-            className="text-indigo-600 hover:text-indigo-800 ml-1"
-            onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError('') }}
+            onClick={handleSubmit}
+            disabled={loading || !username.trim() || !password.trim()}
+            className="w-full py-3 rounded-xl bg-ink text-white font-medium text-sm
+                       hover:bg-accent-hover disabled:bg-warm-gray disabled:cursor-not-allowed
+                       transition-colors mt-6"
           >
-            {mode === 'login' ? '注册' : '去登录'}
+            {loading ? '...' : mode === 'login' ? '进入工坊' : '创建账户'}
           </button>
+
+          <p className="text-center mt-5 text-xs text-warm-gray">
+            {mode === 'login' ? '还没有账户？' : '已有账户？'}
+            <button
+              className="link ml-1 font-medium"
+              onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError('') }}
+            >
+              {mode === 'login' ? '创建' : '登录'}
+            </button>
+          </p>
+        </div>
+
+        <p className="text-center mt-8 text-xs text-warm-gray-light">
+          从小说到剧本，AI 为你铺就改编之路
         </p>
       </div>
     </div>
