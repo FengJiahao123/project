@@ -95,3 +95,17 @@ export interface OutlineResponse {
   analysis_notes: string
   chapter_titles: string[]
 }
+
+// ====== 章节检测 ======
+
+export interface ChapterInfo {
+  index: number
+  title: string
+  length: number
+}
+
+export interface ChaptersResponse {
+  chapters: ChapterInfo[]
+  total_chapters: number
+  total_chars: number
+}

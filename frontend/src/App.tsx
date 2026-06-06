@@ -1,9 +1,9 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import InputSection from './components/InputSection'
-import OutlinePreview from './components/OutlinePreview'
+import ChapterSelector from './components/ChapterSelector'
 import ResultPanel from './components/ResultPanel'
-import { submitConvert, getStatus, analyzeOutline } from './api'
-import type { ConvertResponse, OutlineResponse } from './types'
+import { submitConvert, getStatus, detectChapters } from './api'
+import type { ConvertResponse, ChapterInfo } from './types'
 
 const PHASE_CONFIG = [
   { max: 35, speed: 0.12, label: '📖 正在阅读理解全文...' },
@@ -12,14 +12,14 @@ const PHASE_CONFIG = [
 ]
 
 function App() {
-  // ====== Stage: input | outline | generating | done ======
-  const [stage, setStage] = useState<'input' | 'outline' | 'generating' | 'done'>('input')
+  const [stage, setStage] = useState<'input' | 'chapterSelect' | 'generating' | 'done'>('input')
   const [result, setResult] = useState<ConvertResponse | null>(null)
-  const [outline, setOutline] = useState<OutlineResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // Outline loading
-  const [outlineLoading, setOutlineLoading] = useState(false)
+  // Chapter detection
+  const [fullText, setFullText] = useState('')
+  const [chapters, setChapters] = useState<ChapterInfo[]>([])
+  const [detectLoading, setDetectLoading] = useState(false)
 
   // Smooth progress
   const [displayProgress, setDisplayProgress] = useState(0)
@@ -58,49 +58,40 @@ function App() {
     if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null }
   }, [])
 
-  // ====== Submit text → analyze outline ======
-  const handleSubmit = async (text: string) => {
+  // ====== Submit text → detect chapters ======
+  const handleDetect = async (text: string) => {
     setError(null)
     setResult(null)
-    setOutline(null)
-    setOutlineLoading(true)
-    setStage('outline')
+    setFullText(text)
+    setDetectLoading(true)
 
     try {
-      const o = await analyzeOutline(text)
-      setOutline(o)
+      const resp = await detectChapters(text)
+      setChapters(resp.chapters)
+      setStage('chapterSelect')
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Outline analysis failed')
-      setStage('input')
+      setError(e instanceof Error ? e.message : '章节检测失败')
     } finally {
-      setOutlineLoading(false)
+      setDetectLoading(false)
     }
   }
 
-  // ====== Need original text for conversion — store it ======
-  const [pendingText, setPendingText] = useState('')
-
-  const handleSubmitWrapper = async (text: string) => {
-    setPendingText(text)
-    await handleSubmit(text)
-  }
-
-  const handleConfirmOutlineWrapper = async (editedOutline: OutlineResponse) => {
-    if (!pendingText) return
+  // ====== Select chapters → convert ======
+  const handleStartConvert = async (selectedIndices: number[]) => {
     setStage('generating')
     setDisplayProgress(0)
     setPhaseLabel('📖 正在阅读理解全文...')
     startAnimation()
 
     try {
-      const initial = await submitConvert(pendingText, editedOutline)
+      const initial = await submitConvert(fullText, undefined, selectedIndices)
       setResult(initial)
       if (initial.task_id) {
         startPolling(initial.task_id)
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Request failed')
-      setStage('outline')
+      setError(e instanceof Error ? e.message : '转换请求失败')
+      setStage('chapterSelect')
       clearAnim()
     }
   }
@@ -123,10 +114,10 @@ function App() {
             }, 2000)
           }
         } catch (e) {
-          setError(e instanceof Error ? e.message : 'Polling failed')
+          setError(e instanceof Error ? e.message : '轮询失败')
           stopPolling()
           clearAnim()
-          setStage('outline')
+          setStage('chapterSelect')
         }
       }, 800)
     },
@@ -142,7 +133,6 @@ function App() {
     return () => { stopPolling(); clearAnim() }
   }, [stopPolling, clearAnim])
 
-  // ====== Render ======
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-4xl mx-auto py-8 px-4">
@@ -155,29 +145,23 @@ function App() {
           </p>
         </header>
 
-        {/* Input — always visible until done */}
-        <InputSection onSubmit={handleSubmitWrapper} disabled={stage === 'generating' || stage === 'done'} />
+        <InputSection onSubmit={handleDetect} disabled={stage === 'generating' || detectLoading} />
 
-        {/* Outline loading */}
-        {outlineLoading && (
+        {detectLoading && (
           <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-center">
             <div className="text-2xl animate-spin mb-3">🔍</div>
-            <p className="text-gray-600 font-medium">正在分析小说结构...</p>
-            <p className="text-xs text-gray-400 mt-1">识别场景边界、角色出场顺序、改编建议</p>
+            <p className="text-gray-600 font-medium">正在检测章节...</p>
           </div>
         )}
 
-        {/* Outline result */}
-        {outline && stage === 'outline' && (
-          <OutlinePreview
-            outline={outline}
-            onConfirm={handleConfirmOutlineWrapper}
-            onRetry={() => handleSubmit(pendingText)}
-            loading={false}
+        {stage === 'chapterSelect' && chapters.length > 0 && (
+          <ChapterSelector
+            chapters={chapters}
+            onSubmit={handleStartConvert}
+            onCancel={() => { setStage('input'); setChapters([]) }}
           />
         )}
 
-        {/* Generating — smooth progress */}
         {stage === 'generating' && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mt-6">
             <div className="flex items-center justify-between mb-3">
@@ -193,14 +177,12 @@ function App() {
           </div>
         )}
 
-        {/* Error */}
         {error && (
           <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
             ❌ {error}
           </div>
         )}
 
-        {/* Result */}
         {stage === 'done' && result?.script && (
           <ResultPanel script={result.script} />
         )}

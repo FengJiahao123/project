@@ -80,6 +80,7 @@ class Script(BaseModel):
 class ConvertRequest(BaseModel):
     text: str = Field(..., min_length=1, description="小说全文文本")
     outline: dict | None = Field(default=None, description="用户编辑后的大纲，用于指导生成")
+    chapter_indices: list[int] | None = Field(default=None, description="要转换的章节索引，null 表示全部")
 
 
 class ConvertResponse(BaseModel):

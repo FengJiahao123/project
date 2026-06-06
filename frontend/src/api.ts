@@ -1,12 +1,14 @@
-import type { ConvertResponse, RevisionResponse, OutlineResponse, Script } from './types'
+import type { ConvertResponse, RevisionResponse, OutlineResponse, Script, ChaptersResponse } from './types'
 
 const BASE = '/api'
 
-export async function submitConvert(text: string, outline?: OutlineResponse): Promise<ConvertResponse> {
+export async function submitConvert(
+  text: string, outline?: OutlineResponse, chapterIndices?: number[]
+): Promise<ConvertResponse> {
   const resp = await fetch(`${BASE}/convert`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, outline: outline || null }),
+    body: JSON.stringify({ text, outline: outline || null, chapter_indices: chapterIndices || null }),
   })
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({ detail: resp.statusText }))
@@ -19,6 +21,19 @@ export async function getStatus(taskId: string): Promise<ConvertResponse> {
   const resp = await fetch(`${BASE}/convert/${taskId}`)
   if (!resp.ok) {
     throw new Error('获取状态失败')
+  }
+  return resp.json()
+}
+
+export async function detectChapters(text: string): Promise<ChaptersResponse> {
+  const resp = await fetch(`${BASE}/chapters`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+  })
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ detail: resp.statusText }))
+    throw new Error(err.detail ?? '章节检测失败')
   }
   return resp.json()
 }

@@ -20,10 +20,19 @@ tasks: dict[str, dict] = {}
 llm_provider = DeepSeekProvider() if DEEPSEEK_API_KEY else MockProvider()
 
 
-async def _process_conversion(task_id: str, text: str, outline: dict | None = None):
-    """Background task: single LLM call for entire novel, then assemble."""
+async def _process_conversion(
+    task_id: str, text: str, outline: dict | None = None, chapter_indices: list[int] | None = None
+):
+    """Background task: LLM calls for novel chapters, then assemble."""
     try:
-        chapters = split_chapters(text)
+        all_chapters = split_chapters(text)
+
+        # Filter to selected chapters if indices provided
+        if chapter_indices is not None and len(chapter_indices) > 0:
+            valid = sorted(i for i in chapter_indices if 0 <= i < len(all_chapters))
+            chapters = [all_chapters[i] for i in valid]
+        else:
+            chapters = all_chapters
         chapter_titles = [title for title, _ in chapters]
         tasks[task_id]["chapters"] = chapter_titles
         tasks[task_id]["status"] = "processing"
@@ -69,7 +78,7 @@ async def start_conversion(request: ConvertRequest):
         "error": None,
     }
 
-    asyncio.create_task(_process_conversion(task_id, request.text, request.outline))
+    asyncio.create_task(_process_conversion(task_id, request.text, request.outline, request.chapter_indices))
 
     return ConvertResponse(
         task_id=task_id,
@@ -140,6 +149,23 @@ Return a JSON object (no markdown code blocks):
 4. scene_number sequential across all chapters
 5. Return ONLY valid JSON, no extra text. DO NOT wrap in ```json markdown code blocks. Start your response with { and end with }."""
 
+
+
+@api_router.post("/chapters")
+async def detect_chapters(request: dict):
+    """Detect chapters in novel text, return list with char counts."""
+    text = request.get("text", "")
+    if not text.strip():
+        raise HTTPException(status_code=400, detail="Text is required")
+    chapters = split_chapters(text)
+    return {
+        "chapters": [
+            {"index": i, "title": t, "length": len(c)}
+            for i, (t, c) in enumerate(chapters)
+        ],
+        "total_chapters": len(chapters),
+        "total_chars": sum(len(c) for _, c in chapters),
+    }
 
 
 @api_router.post("/outline")
