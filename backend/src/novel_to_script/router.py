@@ -138,7 +138,8 @@ Return a JSON object (no markdown code blocks):
 2. Each scene should be a self-contained unit with clear beginning/end
 3. Character names must be from the actual novel text
 4. scene_number sequential across all chapters
-5. Return ONLY valid JSON, no extra text"""
+5. Return ONLY valid JSON, no extra text. DO NOT wrap in ```json markdown code blocks. Start your response with { and end with }."""
+
 
 
 @api_router.post("/outline")
@@ -156,10 +157,16 @@ async def analyze_outline(request: dict):
         client = llm_provider._client
         model = llm_provider._model
 
-        # Truncate each chapter to ~2000 chars for fast analysis
+        # For large novels, send first N chapters + last 3 for overview
+        MAX_OUTLINE_CHAPTERS = 20
+        if len(chapters) > MAX_OUTLINE_CHAPTERS:
+            outline_chapters = chapters[:MAX_OUTLINE_CHAPTERS - 3] + chapters[-3:]
+        else:
+            outline_chapters = chapters
+
         parts = []
-        for title, content in chapters:
-            truncated = content[:2000] + ("..." if len(content) > 2000 else "")
+        for title, content in outline_chapters:
+            truncated = content[:1500] + ("..." if len(content) > 1500 else "")
             parts.append(f"## {title}\n\n{truncated}")
         full_text = "\n\n---\n\n".join(parts)
 
@@ -167,10 +174,10 @@ async def analyze_outline(request: dict):
             model=model,
             messages=[
                 {"role": "system", "content": OUTLINE_PROMPT},
-                {"role": "user", "content": f"Analyze this novel and produce a scene breakdown outline:\n\n{full_text}"},
+                {"role": "user", "content": f"Analyze this novel ({len(chapters)} chapters total, showing first {MAX_OUTLINE_CHAPTERS-3} + last 3) and produce a scene breakdown outline:\n\n{full_text}"},
             ],
             temperature=0.5,
-            max_tokens=4096,
+            max_tokens=8192,
         )
         content = resp.choices[0].message.content or ""
 

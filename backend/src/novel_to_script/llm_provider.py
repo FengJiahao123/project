@@ -237,24 +237,51 @@ def _build_character(data: dict) -> Character:
 
 def _extract_json(text: str) -> dict:
     """Extract JSON object from LLM response, handling markdown code blocks."""
+    t = text.strip()
+
+    # 1: direct parse
     try:
-        return json.loads(text)
+        return json.loads(t)
     except json.JSONDecodeError:
         pass
-    m = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text)
+
+    # 2: ```json ... ``` or ``` ... ```
+    m = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", t)
     if m:
         try:
             return json.loads(m.group(1))
         except json.JSONDecodeError:
             pass
-    start = text.find("{")
-    end = text.rfind("}")
-    if start != -1 and end != -1 and end > start:
+
+    # 3: strip opening ```json or ```, try remainder
+    stripped = re.sub(r"^```(?:json)?\s*", "", t)
+    stripped = re.sub(r"\s*```\s*$", "", stripped)
+    if stripped != t:
         try:
-            return json.loads(text[start:end + 1])
+            return json.loads(stripped)
         except json.JSONDecodeError:
             pass
-    raise ValueError(f"Cannot parse JSON from LLM response: {text[:200]}...")
+
+    # 4: extract from first { to last }
+    start = t.find("{")
+    end = t.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        try:
+            return json.loads(t[start:end + 1])
+        except json.JSONDecodeError:
+            pass
+
+    # 5: try stripping leading backticks from trimmed text too
+    if start == -1 and stripped != t:
+        start = stripped.find("{")
+        end = stripped.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            try:
+                return json.loads(stripped[start:end + 1])
+            except json.JSONDecodeError:
+                pass
+
+    raise ValueError(f"Cannot parse JSON from LLM response: {text[:300]}...")
 
 
 def _map_role(role: str) -> str:
