@@ -86,11 +86,14 @@ function App() {
     if (!apiKey.trim()) return
     try {
       await setApiKey(apiKey.trim())
-      setApiKeySet(true)
+      const config = await checkConfig()
+      setApiKeySet(config.api_key_set)
       setShowKeyInput(false)
       setApiKeyState('')
+      setError(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : '设置 API Key 失败')
+      setApiKeySet(false)
     }
   }
 
@@ -181,7 +184,7 @@ function App() {
         try {
           const status = await getStatus(taskId)
           setResult(status)
-          if (status.status === 'completed' || status.status === 'error') {
+          if (status.status === 'completed') {
             stopPolling()
             realDoneRef.current = true
             setTimeout(() => {
@@ -190,6 +193,11 @@ function App() {
               setPhaseLabel('✅ 转换完成')
               setStage('done')
             }, 2000)
+          } else if (status.status === 'error') {
+            stopPolling()
+            clearAnim()
+            setError(status.error || '转换失败，请重试')
+            setStage('input')
           }
         } catch (e) {
           setError(e instanceof Error ? e.message : '轮询失败')
@@ -197,7 +205,7 @@ function App() {
           clearAnim()
           setStage('chapterSelect')
         }
-      }, 800)
+      }, 1000)
     },
     [stopPolling, clearAnim],
   )

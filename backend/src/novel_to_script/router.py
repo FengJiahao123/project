@@ -92,9 +92,9 @@ async def _process_conversion(
 @api_router.post("/convert", response_model=ConvertResponse)
 async def start_conversion(request: ConvertRequest):
     """Submit novel text, return task_id immediately, process in background."""
-    if isinstance(llm_provider, MockProvider) and not has_api_key():
-        raise HTTPException(status_code=400, detail="请先在页面顶部设置 API Key")
     _ensure_provider()
+    if not has_api_key():
+        raise HTTPException(status_code=400, detail="请先在页面顶部设置 API Key")
     chapters = split_chapters(request.text)
 
     if not chapters:
@@ -284,9 +284,9 @@ Return a JSON object (no markdown code blocks):
 @api_router.post("/revision")
 async def revise_script(request: dict):
     """Accept a script JSON + user instruction, return AI-modified script."""
-    if isinstance(llm_provider, MockProvider) and not has_api_key():
-        raise HTTPException(status_code=400, detail="请先在页面顶部设置 API Key")
     _ensure_provider()
+    if not has_api_key():
+        raise HTTPException(status_code=400, detail="请先在页面顶部设置 API Key")
     script_json = request.get("script")
     instruction = request.get("instruction", "")
 
