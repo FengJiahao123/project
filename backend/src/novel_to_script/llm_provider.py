@@ -1,8 +1,4 @@
-"""LLM Provider 抽象接口 + Mock 实现 + DeepSeek 实现
-
-通过 Protocol 定义接口，业务代码只依赖此接口，不依赖具体 SDK。
-更换 LLM API 时只需新增一个实现类。
-"""
+"""LLM Provider abstract interface + Mock + DeepSeek implementation"""
 
 import json
 import re
@@ -14,119 +10,120 @@ from novel_to_script.models import (
 )
 from novel_to_script.config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
 
-SCHEMA_PROMPT = """你是一个专业的剧本改编助手。请将以下小说章节转换为结构化的剧本片段。
+FULL_NOVEL_PROMPT = """You are a professional script adaptation assistant. Convert the following novel into a structured screenplay in YAML-compatible JSON format.
 
-## 输出格式
+## Output Format
 
-请严格返回 JSON 对象（不要包含 markdown 代码块标记），格式如下：
+Return a JSON object (no markdown code blocks):
 
-```json
 {
   "characters": [
     {
       "id": "char_001",
-      "name": "角色名",
-      "role": "主角",
-      "description": "身份背景描述",
-      "traits": ["性格标签"]
+      "name": "Character name",
+      "role": "protagonist/supporting/extra",
+      "description": "Background description",
+      "traits": ["trait1", "trait2"]
     }
   ],
   "scenes": [
     {
       "scene_number": 1,
       "location": {
-        "name": "场景地点",
-        "time": "白天/夜晚/清晨/傍晚",
-        "description": "环境描写"
+        "name": "Location name",
+        "time": "morning/day/night/evening",
+        "description": "Setting description"
       },
       "characters_present": ["char_001"],
       "elements": [
-        {"type": "action", "content": "动作或舞台指示描述"},
-        {"type": "dialogue", "speaker": "char_001", "lines": ["台词行1", "台词行2"], "emotion": "语气（可选）", "notes": "表演备注（可选）"},
-        {"type": "transition", "content": "转场描述"}
+        {"type": "action", "content": "Stage direction or action description"},
+        {"type": "dialogue", "speaker": "char_001", "lines": ["Line 1", "Line 2"], "emotion": "tone", "notes": "performance note"},
+        {"type": "transition", "content": "Transition description"}
       ]
     }
   ]
 }
-```
 
-## 重要规则
+## Rules
 
-1. 角色 id 格式为 char_001, char_002... 按出场顺序编号
-2. role 必须是 "主角"、"配角"、"龙套" 之一
-3. elements 按时间顺序混合排列 action、dialogue、transition
-4. dialogue 的 speaker 必须引用 characters 中已定义的 id
-5. characters_present 列出本场景所有在场角色（包括无台词者）
-6. 仔细分析原文，提取真实角色名和对话内容，不要编造
-7. 只返回 JSON，不要有任何额外文字"""
+1. Read ALL chapters carefully first. Understand the full story, all characters, and all relationships.
+2. Character IDs: char_001, char_002... in order of first appearance across the ENTIRE novel
+3. role must be one of: "protagonist", "supporting", "extra"
+4. elements order by time sequence: mix action, dialogue, transition
+5. dialogue speaker must reference a defined character id
+6. characters_present lists ALL characters in the scene (including silent ones)
+7. Extract REAL character names and dialogue from the text. Do NOT invent.
+8. Return ONLY the JSON object, no extra text."""
 
 
 @runtime_checkable
 class LLMProvider(Protocol):
-    """LLM Provider 协议接口"""
+    """LLM Provider protocol interface"""
 
     async def convert_chapter(
         self, chapter_title: str, chapter_text: str
     ) -> tuple[list[Character], list[Scene]]:
-        """将单个章节转换为角色列表和场景列表。
+        """Convert a single chapter to character and scene lists."""
+        ...
+
+    async def convert_novel(
+        self, chapters: list[tuple[str, str]]
+    ) -> tuple[list[Character], list[Scene]]:
+        """Convert ALL chapters at once to complete character and scene lists.
 
         Args:
-            chapter_title: 章节标题
-            chapter_text: 章节文本内容
+            chapters: List of (chapter_title, chapter_text) tuples
 
         Returns:
-            (新增角色列表, 场景列表)
+            (complete character list, complete scene list)
         """
         ...
 
 
 class MockProvider:
-    """Mock LLM Provider — 返回模拟数据，用于前后端联调和测试"""
+    """Mock LLM Provider for testing without real API"""
 
     async def convert_chapter(
         self, chapter_title: str, chapter_text: str
     ) -> tuple[list[Character], list[Scene]]:
-        """生成模拟剧本数据"""
-
+        """Generate mock script data for one chapter"""
         char_count = max(1, len(chapter_text) // 500)
-
         characters: list[Character] = []
         for i in range(char_count):
-            characters.append(
-                Character(
-                    id=f"char_{i+1:03d}",
-                    name=f"角色{i+1}",
-                    role="主角" if i == 0 else "配角",
-                    description=f"{chapter_title}中出现的角色",
-                    traits=["机智"] if i == 0 else [],
-                )
-            )
-
+            characters.append(Character(
+                id=f"char_{i+1:03d}",
+                name=f"Character {i+1}",
+                role="主角" if i == 0 else "配角",
+                description=f"Character from {chapter_title}",
+                traits=["clever"] if i == 0 else [],
+            ))
         scene = Scene(
             scene_number=1,
-            location=Location(
-                name="示例场景",
-                time="白天",
-                description="一个通用的场景地点",
-            ),
+            location=Location(name="Example", time="day", description="Generic location"),
             characters_present=[c.id for c in characters],
             elements=[
-                ActionElement(
-                    type="action",
-                    content="（这是模拟数据。接入真实 LLM API 后将生成实际剧本内容）",
-                ),
-                ActionElement(
-                    type="action",
-                    content=f"场景发生在{chapter_title}所描述的环境中。",
-                ),
+                ActionElement(type="action", content="(Mock data. Real API will generate actual script content.)"),
             ],
         )
-
         return characters, [scene]
+
+    async def convert_novel(
+        self, chapters: list[tuple[str, str]]
+    ) -> tuple[list[Character], list[Scene]]:
+        """Generate mock script data for all chapters at once"""
+        chars: list[Character] = []
+        scenes: list[Scene] = []
+        for i, (title, content) in enumerate(chapters):
+            c, s = await self.convert_chapter(title, content)
+            for sc in s:
+                sc.scene_number = len(scenes) + 1
+            chars.extend(c)
+            scenes.extend(s)
+        return chars, scenes
 
 
 class DeepSeekProvider:
-    """DeepSeek LLM Provider — 使用 DeepSeek API 进行小说→剧本转换"""
+    """DeepSeek LLM Provider for novel-to-script conversion"""
 
     def __init__(self):
         self._client = AsyncOpenAI(
@@ -138,52 +135,73 @@ class DeepSeekProvider:
     async def convert_chapter(
         self, chapter_title: str, chapter_text: str
     ) -> tuple[list[Character], list[Scene]]:
-        """调用 DeepSeek API 将章节转换为剧本片段"""
-
-        user_message = f"## 章节标题\n{chapter_title}\n\n## 章节内容\n{chapter_text}"
-
+        """Convert a single chapter (legacy method, prefer convert_novel)"""
+        user_message = f"## Chapter Title\n{chapter_title}\n\n## Chapter Content\n{chapter_text}"
         response = await self._client.chat.completions.create(
             model=self._model,
             messages=[
-                {"role": "system", "content": SCHEMA_PROMPT},
+                {"role": "system", "content": FULL_NOVEL_PROMPT},
                 {"role": "user", "content": user_message},
             ],
             temperature=0.7,
             max_tokens=8192,
         )
-
         content = response.choices[0].message.content or ""
-
-        # 解析 JSON
         data = _extract_json(content)
+        characters = [_build_character(c) for c in data.get("characters", [])]
+        scenes = [_parse_scene(s, i + 1) for i, s in enumerate(data.get("scenes", []))]
+        return characters, scenes
 
-        # 转换为 Pydantic 模型
-        characters = [Character(**c) for c in data.get("characters", [])]
-        scenes = [_parse_scene(s) for s in data.get("scenes", [])]
+    async def convert_novel(
+        self, chapters: list[tuple[str, str]]
+    ) -> tuple[list[Character], list[Scene]]:
+        """Convert entire novel at once — one API call for all chapters."""
+        # Build a single message with all chapters
+        parts = []
+        for title, content in chapters:
+            parts.append(f"## {title}\n\n{content}")
+        full_text = "\n\n---\n\n".join(parts)
 
+        response = await self._client.chat.completions.create(
+            model=self._model,
+            messages=[
+                {"role": "system", "content": FULL_NOVEL_PROMPT},
+                {"role": "user", "content": full_text},
+            ],
+            temperature=0.7,
+            max_tokens=16384,
+        )
+        content = response.choices[0].message.content or ""
+        data = _extract_json(content)
+        characters = [_build_character(c) for c in data.get("characters", [])]
+        scenes = [_parse_scene(s, i + 1) for i, s in enumerate(data.get("scenes", []))]
         return characters, scenes
 
 
-def _extract_json(text: str) -> dict:
-    """从 LLM 响应中提取 JSON 对象。
+def _build_character(data: dict) -> Character:
+    """Build Character from LLM dict with role mapping."""
+    return Character(
+        id=data.get("id", ""),
+        name=data.get("name", ""),
+        role=_map_role(data.get("role", "")),
+        description=data.get("description", ""),
+        traits=data.get("traits", []),
+        relationships=data.get("relationships", []),
+    )
 
-    处理可能包裹在 markdown 代码块中的 JSON。
-    """
-    # 尝试直接解析
+
+def _extract_json(text: str) -> dict:
+    """Extract JSON object from LLM response, handling markdown code blocks."""
     try:
         return json.loads(text)
     except json.JSONDecodeError:
         pass
-
-    # 尝试提取 markdown 代码块中的 JSON
-    json_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text)
-    if json_match:
+    m = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text)
+    if m:
         try:
-            return json.loads(json_match.group(1))
+            return json.loads(m.group(1))
         except json.JSONDecodeError:
             pass
-
-    # 尝试找到第一个 { 到最后一个 } 的范围
     start = text.find("{")
     end = text.rfind("}")
     if start != -1 and end != -1 and end > start:
@@ -191,30 +209,36 @@ def _extract_json(text: str) -> dict:
             return json.loads(text[start:end + 1])
         except json.JSONDecodeError:
             pass
+    raise ValueError(f"Cannot parse JSON from LLM response: {text[:200]}...")
 
-    raise ValueError(f"无法从 LLM 响应中解析 JSON: {text[:200]}...")
+
+def _map_role(role: str) -> str:
+    """Map English/Chinese role values to Schema values."""
+    m = {
+        "protagonist": "主角", "supporting": "配角", "extra": "龙套",
+        "主角": "主角", "配角": "配角", "龙套": "龙套",
+    }
+    return m.get(role.lower() if role else "", "配角")
 
 
-def _parse_scene(data: dict) -> Scene:
-    """将 LLM 返回的字典转换为 Scene 对象"""
+def _parse_scene(data: dict, scene_number: int) -> Scene:
+    """Convert LLM dict to Scene, with explicit scene_number override."""
     elements = []
     for el in data.get("elements", []):
-        el_type = el.get("type", "")
-        if el_type == "action":
+        t = el.get("type", "")
+        if t == "action":
             elements.append(ActionElement(type="action", content=el.get("content", "")))
-        elif el_type == "dialogue":
+        elif t == "dialogue":
             elements.append(DialogueElement(
-                type="dialogue",
-                speaker=el.get("speaker", ""),
+                type="dialogue", speaker=el.get("speaker", ""),
                 lines=el.get("lines", []),
                 emotion=el.get("emotion", ""),
                 notes=el.get("notes", ""),
             ))
-        elif el_type == "transition":
+        elif t == "transition":
             elements.append(TransitionElement(type="transition", content=el.get("content", "")))
-
     return Scene(
-        scene_number=data.get("scene_number", 1),
+        scene_number=data.get("scene_number", scene_number),
         location=Location(
             name=data.get("location", {}).get("name", ""),
             time=data.get("location", {}).get("time", ""),

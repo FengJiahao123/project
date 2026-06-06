@@ -1,10 +1,15 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import InputSection from './components/InputSection'
 import ChapterList from './components/ChapterList'
-import ProgressDisplay from './components/ProgressDisplay'
 import ResultPanel from './components/ResultPanel'
 import { submitConvert, getStatus } from './api'
 import type { ConvertResponse } from './types'
+
+const PHASE_CONFIG = [
+  { max: 35, speed: 0.12, label: '📖 正在阅读理解全文...' },
+  { max: 70, speed: 0.08, label: '🔍 正在分析角色与场景...' },
+  { max: 90, speed: 0.04, label: '✍️ 正在生成剧本...' },
+]
 
 function App() {
   const [result, setResult] = useState<ConvertResponse | null>(null)
@@ -12,58 +17,52 @@ function App() {
   const [error, setError] = useState<string | null>(null)
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // ===== 丝滑进度 =====
-  const [smoothProgress, setSmoothProgress] = useState(0)
-  const smoothTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const timingRef = useRef({
-    totalChapters: 0,
-    startTime: 0,
-    firstChapterDone: false,
-  })
+  // Smooth progress state
+  const [displayProgress, setDisplayProgress] = useState(0)
+  const [phaseLabel, setPhaseLabel] = useState('')
+  const animTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const realDoneRef = useRef(false)
 
-  const clearSmoothTimer = useCallback(() => {
-    if (smoothTimerRef.current) {
-      clearInterval(smoothTimerRef.current)
-      smoothTimerRef.current = null
+  const clearAnim = useCallback(() => {
+    if (animTimerRef.current) {
+      clearInterval(animTimerRef.current)
+      animTimerRef.current = null
     }
   }, [])
 
-  /** 启动丝滑进度动画：根据第一轮 LLM 耗时预测总时长，平滑递增 */
-  const startSmoothProgress = useCallback((backendProgress: number, totalChapters: number) => {
-    clearSmoothTimer()
+  const startAnimation = useCallback(() => {
+    clearAnim()
+    realDoneRef.current = false
+    setDisplayProgress(0)
 
-    const now = Date.now()
-    const elapsed = now - timingRef.current.startTime
+    animTimerRef.current = setInterval(() => {
+      setDisplayProgress(prev => {
+        if (realDoneRef.current) {
+          // Fast-forward to 100 when real completion arrives
+          const next = prev + 2
+          if (next >= 100) {
+            clearAnim()
+            return 100
+          }
+          return next
+        }
 
-    if (!timingRef.current.firstChapterDone && backendProgress > 0 && backendProgress < 100) {
-      timingRef.current.firstChapterDone = true
-      // 第一轮完成 —— 推算总时间
-      const progressPerChapter = 100 / totalChapters
-      const chaptersDone = Math.floor(backendProgress / progressPerChapter)
-      const timePerChapter = chaptersDone > 0 ? elapsed / chaptersDone : elapsed
-      const estimatedTotal = timePerChapter * totalChapters
-      const remaining = Math.max(0, estimatedTotal - elapsed)
+        // Pick current phase
+        let phase = PHASE_CONFIG[0]
+        for (const p of PHASE_CONFIG) {
+          if (prev < p.max) { phase = p; break }
+        }
+        // If past all phases, stay at last phase max
+        if (prev >= PHASE_CONFIG[PHASE_CONFIG.length - 1].max) {
+          phase = PHASE_CONFIG[PHASE_CONFIG.length - 1]
+        }
 
-      const startPct = backendProgress
-      const startTime = now
-
-      smoothTimerRef.current = setInterval(() => {
-        const dt = (Date.now() - startTime) / 1000
-        const fraction = Math.min(1, dt / (remaining / 1000 + 0.001))
-        const displayed = startPct + (100 - startPct) * fraction
-        setSmoothProgress(Math.min(100, Math.floor(displayed * 10) / 10))
-      }, 60)
-    }
-  }, [clearSmoothTimer])
-
-  // 当 real progress === 100，强制丝滑条到 100
-  useEffect(() => {
-    if (result?.progress === 100) {
-      clearSmoothTimer()
-      setSmoothProgress(100)
-    }
-  }, [result?.progress, clearSmoothTimer])
-  // ===== / 丝滑进度 =====
+        setPhaseLabel(phase.label)
+        const next = prev + phase.speed
+        return Math.min(next, phase.max)
+      })
+    }, 50)
+  }, [clearAnim])
 
   const stopPolling = useCallback(() => {
     if (pollingRef.current) {
@@ -72,68 +71,65 @@ function App() {
     }
   }, [])
 
-  const startPolling = useCallback((taskId: string, totalChapters: number) => {
+  const startPolling = useCallback((taskId: string) => {
     stopPolling()
     pollingRef.current = setInterval(async () => {
       try {
         const status = await getStatus(taskId)
         setResult(status)
 
-        // 每次后端进度更新，触发丝滑动画重算
-        if (status.progress > 0 && status.progress < 100) {
-          startSmoothProgress(status.progress, totalChapters)
-        }
-
         if (status.status === 'completed' || status.status === 'error') {
           stopPolling()
-          clearSmoothTimer()
-          setLoading(false)
+          realDoneRef.current = true
+          // Give animation 2s to fast-forward to 100, then show result
+          setTimeout(() => {
+            clearAnim()
+            setDisplayProgress(100)
+            setPhaseLabel('✅ 转换完成')
+            setLoading(false)
+          }, 2000)
         }
       } catch (e) {
-        setError(e instanceof Error ? e.message : '获取进度失败')
+        setError(e instanceof Error ? e.message : 'Polling failed')
         stopPolling()
-        clearSmoothTimer()
+        clearAnim()
         setLoading(false)
       }
-    }, 500)
-  }, [stopPolling, startSmoothProgress, clearSmoothTimer])
+    }, 800)
+  }, [stopPolling, clearAnim])
 
   const handleSubmit = async (text: string) => {
     setLoading(true)
     setError(null)
     setResult(null)
-    setSmoothProgress(0)
-    clearSmoothTimer()
+    setDisplayProgress(0)
+    setPhaseLabel('')
+    clearAnim()
 
     try {
       const initial = await submitConvert(text)
-
-      timingRef.current = {
-        totalChapters: initial.chapters.length,
-        startTime: Date.now(),
-        firstChapterDone: false,
-      }
-
       setResult(initial)
 
+      // Start smooth animation immediately
+      setPhaseLabel('📖 正在阅读理解全文...')
+      startAnimation()
+
       if (initial.task_id) {
-        startPolling(initial.task_id, initial.chapters.length)
+        startPolling(initial.task_id)
       } else {
         setLoading(false)
+        clearAnim()
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : '未知错误')
+      setError(e instanceof Error ? e.message : 'Request failed')
       setLoading(false)
+      clearAnim()
     }
   }
 
-  // 页面卸载时清理
   useEffect(() => {
-    return () => {
-      stopPolling()
-      clearSmoothTimer()
-    }
-  }, [stopPolling, clearSmoothTimer])
+    return () => { stopPolling(); clearAnim() }
+  }, [stopPolling, clearAnim])
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -154,10 +150,22 @@ function App() {
         )}
 
         {loading && (
-          <ProgressDisplay
-            progress={smoothProgress}
-            chapters={result?.chapters || []}
-          />
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mt-6">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-gray-700">
+                {phaseLabel || '🔄 准备中...'}
+              </h3>
+              <span className="text-sm font-mono text-indigo-600">
+                {Math.round(displayProgress)}%
+              </span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2.5">
+              <div
+                className="bg-indigo-600 h-2.5 rounded-full transition-all duration-300 ease-linear"
+                style={{ width: `${displayProgress}%` }}
+              />
+            </div>
+          </div>
         )}
 
         {error && (
