@@ -4,7 +4,7 @@ import ChapterSelector from './components/ChapterSelector'
 import ResultPanel from './components/ResultPanel'
 import AuthPage from './components/AuthPage'
 import ProjectList from './components/ProjectList'
-import { submitConvert, getStatus, detectChapters, setApiKey, checkConfig, apiCreateProject, apiGetProject, apiSaveProject } from './api'
+import { submitConvert, getStatus, detectChapters, setApiKey, checkConfig, apiCreateProject, apiGetProject, apiSaveProject, apiListProjects } from './api'
 import type { ConvertResponse, ChapterInfo } from './types'
 
 const PHASE_CONFIG = [
@@ -20,9 +20,21 @@ function App() {
   const [view, setView] = useState<'projects' | 'editor'>('projects')
   const [projectId, setProjectId] = useState<number | null>(null)
   const [projectName, setProjectName] = useState('')
+  const [authChecked, setAuthChecked] = useState(false)
+
+  // Validate token on mount
+  useEffect(() => {
+    if (token) {
+      apiListProjects()
+        .then(() => setAuthChecked(true))
+        .catch(() => { localStorage.removeItem('token'); localStorage.removeItem('username'); setToken(null); setAuthChecked(true) })
+    } else {
+      setAuthChecked(true)
+    }
+  }, [])
 
   const handleLogin = (t: string, name: string) => {
-    setToken(t); setUsername(name); setView('projects')
+    setToken(t); setUsername(name); setAuthChecked(true); setView('projects')
   }
   const handleLogout = () => {
     localStorage.removeItem('token'); localStorage.removeItem('username')
@@ -195,6 +207,7 @@ function App() {
   }, [stopPolling, clearAnim])
 
   // ====== Auth gate ======
+  if (!authChecked) return <div className="min-h-screen bg-gray-50 flex items-center justify-center"><p className="text-gray-400">加载中...</p></div>
   if (!token) return <AuthPage onLogin={handleLogin} />
   if (view === 'projects') {
     return <ProjectList onOpen={handleOpenProject} onNew={handleNewProject} onLogout={handleLogout} username={username} />
