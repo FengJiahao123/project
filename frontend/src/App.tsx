@@ -70,6 +70,7 @@ function App() {
   }
 
   const handleOpenRevision = async (id: number, name: string, revisionId: number) => {
+    isViewingHistory.current = true
     setProjectId(id); setProjectName(name)
     setStage('done')
     try {
@@ -93,9 +94,11 @@ function App() {
   const [result, setResult] = useState<ConvertResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // Save script + record revision after each generation completes
+  const isViewingHistory = useRef(false)
+
+  // Save script + record revision after each NEW generation only
   useEffect(() => {
-    if (result?.status === 'completed' && result.script && projectId) {
+    if (result?.status === 'completed' && result.script && projectId && !isViewingHistory.current) {
       const json = JSON.stringify(result.script)
       const sceneCount = result.script.scenes?.length || 0
       const chapterCount = result.chapters?.length || 0
@@ -103,6 +106,7 @@ function App() {
       const chapterNames = (result.chapters || []).join(', ')
       apiAddRevision(projectId, 'AI 生成', json, chapterCount, sceneCount, chapterNames).catch(() => {})
     }
+    isViewingHistory.current = false  // reset after handling
   }, [result?.status])
 
   // API Key
