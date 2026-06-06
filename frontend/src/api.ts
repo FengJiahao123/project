@@ -87,6 +87,11 @@ export async function apiListRevisions(projectId: number) {
   return resp.json()
 }
 
+export async function apiGetRevision(projectId: number, revisionId: number) {
+  const resp = await fetch(`${BASE}/projects/${projectId}/revisions/${revisionId}`, { headers: headers() })
+  return resp.json()
+}
+
 // ====== Convert ======
 
 export async function submitConvert(

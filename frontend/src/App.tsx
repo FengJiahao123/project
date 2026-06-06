@@ -4,7 +4,7 @@ import ChapterSelector from './components/ChapterSelector'
 import ResultPanel from './components/ResultPanel'
 import AuthPage from './components/AuthPage'
 import ProjectList from './components/ProjectList'
-import { submitConvert, getStatus, detectChapters, setApiKey, checkConfig, apiCreateProject, apiGetProject, apiSaveProject, apiListProjects, apiAddRevision } from './api'
+import { submitConvert, getStatus, detectChapters, setApiKey, checkConfig, apiCreateProject, apiGetProject, apiSaveProject, apiListProjects, apiAddRevision, apiGetRevision } from './api'
 import type { ConvertResponse, ChapterInfo } from './types'
 
 const PHASE_CONFIG = [
@@ -45,14 +45,46 @@ function App() {
     const name = prompt('项目名称：') || '未命名项目'
     const result = await apiCreateProject(name)
     if (result.ok) {
-      setProjectId(result.project_id); setProjectName(name); setView('editor')
+      setProjectId(result.project_id); setProjectName(name)
+      setStage('input'); setResult(null); setError(null)
+      setChapters([]); setFullText(''); setDisplayProgress(0)
+      setView('editor')
     }
   }
 
   const handleOpenProject = async (id: number, name: string) => {
-    const proj = await apiGetProject(id)
     setProjectId(id); setProjectName(name)
+    setStage('input'); setResult(null); setError(null)
+    setChapters([]); setFullText(''); setDisplayProgress(0); setPhaseLabel('')
+    clearAnim(); stopPolling()
+    const proj = await apiGetProject(id)
     if (proj.original_text) setFullText(proj.original_text)
+    setView('editor')
+  }
+
+  const handleBackToProjects = () => {
+    setView('projects');
+    setProjectId(null); setResult(null); setError(null)
+    setStage('input'); setChapters([]); setFullText(''); setDisplayProgress(0)
+    clearAnim(); stopPolling()
+  }
+
+  const handleOpenRevision = async (id: number, name: string, revisionId: number) => {
+    setProjectId(id); setProjectName(name)
+    setStage('done')
+    try {
+      const rev = await apiGetRevision(id, revisionId)
+      if (rev.script_json) {
+        const script = JSON.parse(rev.script_json)
+        setResult({
+          task_id: null, status: 'completed', progress: 100,
+          chapters: rev.chapter_names ? rev.chapter_names.split(', ') : [],
+          script, error: null,
+        })
+      }
+    } catch (e) {
+      setError('加载历史版本失败')
+    }
     setView('editor')
   }
 
@@ -223,7 +255,7 @@ function App() {
   if (!authChecked) return <div className="min-h-screen bg-gray-50 flex items-center justify-center"><p className="text-gray-400">加载中...</p></div>
   if (!token) return <AuthPage onLogin={handleLogin} />
   if (view === 'projects') {
-    return <ProjectList onOpen={handleOpenProject} onNew={handleNewProject} onLogout={handleLogout} username={username} />
+    return <ProjectList onOpen={handleOpenProject} onOpenRevision={handleOpenRevision} onNew={handleNewProject} onLogout={handleLogout} username={username} />
   }
 
   return (
@@ -234,7 +266,7 @@ function App() {
             🎬 AI 小说转剧本工具
           </h1>
           <p className="text-gray-500">
-            {projectName} | <button onClick={() => setView('projects')} className="text-indigo-600 hover:text-indigo-800">返回项目列表</button>
+            {projectName} | <button onClick={handleBackToProjects} className="text-indigo-600 hover:text-indigo-800">返回项目列表</button>
           </p>
         </header>
 

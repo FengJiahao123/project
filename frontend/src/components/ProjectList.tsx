@@ -10,12 +10,13 @@ interface Project {
 
 interface Props {
   onOpen: (projectId: number, name: string) => void
+  onOpenRevision: (projectId: number, name: string, revisionId: number) => void
   onNew: () => void
   onLogout: () => void
   username: string
 }
 
-export default function ProjectList({ onOpen, onNew, onLogout, username }: Props) {
+export default function ProjectList({ onOpen, onOpenRevision, onNew, onLogout, username }: Props) {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -92,11 +93,16 @@ export default function ProjectList({ onOpen, onNew, onLogout, username }: Props
                       <p className="text-xs text-gray-400 py-1">暂无记录</p>
                     ) : (
                       revisions[p.id].slice(0, 5).map((r: any) => (
-                        <div key={r.id} className="text-xs text-gray-500 py-0.5">
+                        <div
+                          key={r.id}
+                          className="text-xs text-gray-500 py-1 px-1 rounded hover:bg-indigo-50 cursor-pointer transition-colors"
+                          onClick={(e) => { e.stopPropagation(); onOpenRevision(p.id, p.name, r.id) }}
+                        >
                           <div className="flex items-center gap-2">
                             <span className="text-gray-300">{r.created_at?.slice(0, 10)}</span>
                             <span className="font-medium text-gray-600">{r.summary}</span>
                             <span className="text-gray-400">{r.action}</span>
+                            <span className="text-indigo-400 ml-auto text-[10px]">查看 →</span>
                           </div>
                           {r.chapter_names && (
                             <div className="text-gray-400 ml-2 mt-0.5 truncate max-w-xs">
