@@ -92,3 +92,16 @@ class ConvertResponse(BaseModel):
     )
     script: Script | None = Field(default=None, description="转换完成的剧本")
     error: str | None = Field(default=None, description="错误信息")
+
+
+# ====== AI 协作修改 ======
+
+class RevisionRequest(BaseModel):
+    script: dict = Field(..., description="当前完整剧本 JSON")
+    instruction: str = Field(..., min_length=1, description="用户修改指令")
+
+
+class RevisionResponse(BaseModel):
+    modified_script: dict = Field(..., description="修改后的完整剧本 JSON")
+    message: str = Field(..., description="AI 对修改的说明")
+    changes_summary: list[str] = Field(default_factory=list, description="变更摘要列表")

@@ -56,3 +56,11 @@ export interface ConvertResponse {
   script: Script | null
   error: string | null
 }
+
+// ====== AI 协作修改 ======
+
+export interface RevisionResponse {
+  modified_script: Script
+  message: string
+  changes_summary: string[]
+}

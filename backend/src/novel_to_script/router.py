@@ -1,6 +1,7 @@
 """FastAPI routes — /api/convert and /api/status"""
 
 import asyncio
+import json
 import uuid
 from fastapi import APIRouter, HTTPException
 from novel_to_script.models import (
@@ -95,3 +96,64 @@ async def get_status(task_id: str):
         script=task.get("script"),
         error=task.get("error"),
     )
+
+
+REVISION_PROMPT = """You are a professional script editor. Given a complete script in JSON format and a user's revision instruction, modify the script accordingly.
+
+## Rules
+
+1. ONLY modify parts related to the user's instruction. Keep everything else identical.
+2. Return the ENTIRE modified script as valid JSON — not just the changed parts.
+3. You may add/remove/modify scenes, characters, dialogue, actions, or any element.
+4. If adding new characters, assign them new IDs (char_NNN format, next available number).
+5. If the instruction changes a character's personality, update their traits[] and adjust their dialogue emotion/notes accordingly.
+6. Provide a brief summary of what you changed in Chinese.
+
+## Output Format
+
+Return a JSON object (no markdown code blocks):
+
+{
+  "modified_script": { ... full script JSON ... },
+  "message": "修改说明 in Chinese",
+  "changes_summary": ["变更1", "变更2"]
+}"""
+
+
+@api_router.post("/revision")
+async def revise_script(request: dict):
+    """Accept a script JSON + user instruction, return AI-modified script."""
+    script_json = request.get("script")
+    instruction = request.get("instruction", "")
+
+    if not script_json or not instruction.strip():
+        raise HTTPException(status_code=400, detail="script and instruction are required")
+
+    try:
+        client = llm_provider._client
+        model = llm_provider._model
+
+        payload = json.dumps(script_json, ensure_ascii=False, indent=2)
+        user_message = f"## Original Script\n\n```json\n{payload}\n```\n\n## Revision Instruction\n\n{instruction}"
+
+        resp = await client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": REVISION_PROMPT},
+                {"role": "user", "content": user_message},
+            ],
+            temperature=0.5,
+            max_tokens=16384,
+        )
+        content = resp.choices[0].message.content or ""
+
+        from novel_to_script.llm_provider import _extract_json
+        data = _extract_json(content)
+
+        return {
+            "modified_script": data.get("modified_script", script_json),
+            "message": data.get("message", "修改完成"),
+            "changes_summary": data.get("changes_summary", []),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI revision failed: {str(e)}")

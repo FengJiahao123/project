@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import yaml from 'js-yaml'
 import type { Script } from '../types'
 import YAMLPreview from './YAMLPreview'
@@ -10,18 +10,27 @@ interface Props {
 
 type Tab = 'yaml' | 'characters' | 'stats' | 'script'
 
-export default function ResultPanel({ script }: Props) {
-  const [tab, setTab] = useState<Tab>('yaml')
+export default function ResultPanel({ script: initialScript }: Props) {
+  const [tab, setTab] = useState<Tab>('script')
+  const [script, setScript] = useState<Script>(initialScript)
+
+  // Sync if parent re-converts (new script from scratch)
+  useEffect(() => {
+    setScript(initialScript)
+  }, [initialScript])
 
   const tabs: { key: Tab; label: string }[] = [
+    { key: 'script', label: '📜 剧本预览' },
     { key: 'yaml', label: '📄 YAML 预览' },
     { key: 'characters', label: '👤 角色表' },
     { key: 'stats', label: '📊 场景统计' },
-    { key: 'script', label: '📜 剧本预览' },
   ]
 
+  const handleScriptUpdate = (updated: Script) => {
+    setScript(updated)
+  }
+
   const handleDownload = () => {
-    // 将 Script 对象转为 YAML 字符串
     const yamlString = yaml.dump(script, {
       indent: 2,
       lineWidth: -1,
@@ -135,7 +144,9 @@ export default function ResultPanel({ script }: Props) {
         </div>
       )}
 
-      {tab === 'script' && <ScriptPreview script={script} />}
+      {tab === 'script' && (
+        <ScriptPreview script={script} onScriptUpdate={handleScriptUpdate} />
+      )}
     </div>
   )
 }

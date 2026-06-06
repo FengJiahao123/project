@@ -1,4 +1,4 @@
-import type { ConvertResponse } from './types'
+import type { ConvertResponse, RevisionResponse, Script } from './types'
 
 const BASE = '/api'
 
@@ -19,6 +19,22 @@ export async function getStatus(taskId: string): Promise<ConvertResponse> {
   const resp = await fetch(`${BASE}/convert/${taskId}`)
   if (!resp.ok) {
     throw new Error('获取状态失败')
+  }
+  return resp.json()
+}
+
+export async function submitRevision(
+  script: Script,
+  instruction: string,
+): Promise<RevisionResponse> {
+  const resp = await fetch(`${BASE}/revision`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ script, instruction }),
+  })
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ detail: resp.statusText }))
+    throw new Error(err.detail ?? 'AI 修改失败')
   }
   return resp.json()
 }
