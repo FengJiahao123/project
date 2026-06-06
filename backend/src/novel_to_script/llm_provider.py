@@ -11,52 +11,59 @@ from novel_to_script.models import (
 from novel_to_script.config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
 from novel_to_script.assembler import merge_chapter_result
 
-FULL_NOVEL_PROMPT = """你是一个专业的影视剧本改编专家。请将以下小说完整改编为结构化的剧本。
+FULL_NOVEL_PROMPT = """你是一个专业的剧本转写专家。你的任务是将小说的**每一个情节**都转换为剧本格式，决不遗漏。
 
 ## 输出格式
 
-返回 JSON 对象（不要用 markdown 代码块包裹）：
-
+返回 JSON（不要 markdown 包裹）：
 {
-  "characters": [
-    {
-      "id": "char_001",
-      "name": "角色名",
-      "role": "主角/配角/龙套",
-      "description": "角色背景描述",
-      "traits": ["性格标签"]
-    }
-  ],
-  "scenes": [
-    {
-      "scene_number": 1,
-      "location": {
-        "name": "场景地点",
-        "time": "清晨/白天/下午/傍晚/夜晚",
-        "description": "环境细节描写"
-      },
-      "characters_present": ["char_001"],
-      "elements": [
-        {"type": "action", "content": "详细的动作或舞台指示"},
-        {"type": "dialogue", "speaker": "char_001", "lines": ["台词第一句", "台词第二句"], "emotion": "语气情绪", "notes": "表演提示"},
-        {"type": "transition", "content": "转场方式"}
-      ]
-    }
-  ]
+  "characters": [{"id": "char_001", "name": "角色名", "role": "主角/配角/龙套", "description": "角色背景", "traits": ["性格标签"]}],
+  "scenes": [{
+    "scene_number": 1,
+    "location": {"name": "地点", "time": "清晨/上午/下午/傍晚/夜晚", "description": "环境细节"},
+    "characters_present": ["char_001"],
+    "elements": [元素列表]
+  }]
 }
 
-## 核心规则（非常重要）
+元素类型：
+- {"type": "action", "content": "动作描述"}
+- {"type": "dialogue", "speaker": "char_001", "lines": ["台词1", "台词2"], "emotion": "语气", "notes": "提示"}
+- {"type": "transition", "content": "转场"}
 
-1. **先通读全部章节**，理解完整故事脉络、所有角色和他们的关系
-2. **不要概括或省略**。每个关键情节都要成为独立的场景。一场对话 = 一个场景，一次重要事件 = 一个场景
-3. **每个场景至少 2 个 elements**，包含原文中的真实对话和动作描述
-4. **角色 ID 按出场顺序编号**：char_001, char_002... 全局唯一
-5. role 选其一：主角 / 配角 / 龙套
-6. elements 按剧情时间顺序混合排列 action、dialogue、transition
-7. dialogue 的 speaker 必须引用 characters 中已定义的 id
-8. characters_present 列出本场景所有在场角色（包括没台词但有动作的）
-9. **提取原文中真实的角色名和对话**，不要自己编造
-10. 只返回 JSON，不要任何额外文字"""
+## 最重要的规则：不要遗漏任何情节
+
+**每一段对话 = 一个场景**。**每一次人物行动 = 一个场景**。**每一次地点转移 = 一个场景**。
+
+判断是否该有单独场景的标准：
+- 两个人说了话 → 必须有 dialogue element
+- 主角做了某个动作（买东西、走路遇见人、干活）→ 必须有 action element
+- 环境或时间变了 → 新场景
+- 出现了原文中没有的新人物 → 必须加入 characters 列表
+
+**对于重要情节**（推动故事、展示人物关系）：4-6 个 elements，包含完整对话和情感标注。
+**对于过渡性情节**（走路、干活、日常）：1-2 个 action element 概括即可，但不能省略。
+
+## 示例：一章应该拆成多少场景
+
+一章 3000 字的小说，通常包含 4-7 个场景。例如：
+- 主角起床、回忆往事 → 场景1
+- 邻居来访、告知消息 → 场景2
+- 主角去镇上、路遇某人 → 场景3
+- 买卖交易、被他人抢先 → 场景4（绝不能漏！）
+- 回家路上、遇到算命先生 → 场景5
+- 回到家、与邻居对话 → 场景6
+
+**检查方法**：生成后数一下，一章 3000 字至少产出 4 个场景。如果只有 2 个场景，肯定漏了。
+
+## 其他规则
+
+1. 角色 ID char_001, char_002... 按首次出场顺序
+2. role 必须是：主角/配角/龙套
+3. speaker 引用 characters 中已定义的 id
+4. 真实角色名、真实对话，不编造
+5. 先通读全文再开始写
+6. 只返回 JSON，不返回其他文字"""
 
 
 @runtime_checkable
