@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import InputSection from './components/InputSection'
 import ChapterSelector from './components/ChapterSelector'
 import ResultPanel from './components/ResultPanel'
-import { submitConvert, getStatus, detectChapters } from './api'
+import { submitConvert, getStatus, detectChapters, setApiKey, checkConfig } from './api'
 import type { ConvertResponse, ChapterInfo } from './types'
 
 const PHASE_CONFIG = [
@@ -15,6 +15,27 @@ function App() {
   const [stage, setStage] = useState<'input' | 'chapterSelect' | 'generating' | 'done'>('input')
   const [result, setResult] = useState<ConvertResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  // API Key
+  const [apiKey, setApiKeyState] = useState('')
+  const [apiKeySet, setApiKeySet] = useState(false)
+  const [showKeyInput, setShowKeyInput] = useState(false)
+
+  useEffect(() => {
+    checkConfig().then((c) => setApiKeySet(c.api_key_set)).catch(() => {})
+  }, [])
+
+  const handleSetKey = async () => {
+    if (!apiKey.trim()) return
+    try {
+      await setApiKey(apiKey.trim())
+      setApiKeySet(true)
+      setShowKeyInput(false)
+      setApiKeyState('')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '设置 API Key 失败')
+    }
+  }
 
   // Chapter detection
   const [fullText, setFullText] = useState('')
@@ -144,6 +165,58 @@ function App() {
             将小说文本自动转换为结构化 YAML 剧本格式
           </p>
         </header>
+
+        {/* API Key */}
+        <div className="mb-4 flex items-center justify-center">
+          {apiKeySet ? (
+            <div className="flex items-center gap-2 text-xs text-green-600 bg-green-50 px-3 py-1.5 rounded-full">
+              ✅ API Key 已设置
+              <button
+                onClick={() => setShowKeyInput(true)}
+                className="text-gray-400 hover:text-gray-600 ml-1"
+              >
+                （更换）
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 px-4 py-2 rounded-lg">
+              <span className="text-xs text-amber-700 font-medium">⚠️ 请设置 DeepSeek API Key：</span>
+              <input
+                className="text-xs px-2 py-1 border border-gray-300 rounded w-64 font-mono"
+                type="password"
+                placeholder="sk-..."
+                value={apiKey}
+                onChange={(e) => setApiKeyState(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSetKey() }}
+              />
+              <button
+                onClick={handleSetKey}
+                disabled={!apiKey.trim()}
+                className="text-xs px-3 py-1 bg-amber-600 text-white rounded hover:bg-amber-700 disabled:bg-gray-300 transition-colors"
+              >
+                保存
+              </button>
+            </div>
+          )}
+          {showKeyInput && apiKeySet && (
+            <div className="flex items-center gap-2 ml-2">
+              <input
+                className="text-xs px-2 py-1 border border-gray-300 rounded w-48 font-mono"
+                type="password"
+                placeholder="输入新 Key..."
+                value={apiKey}
+                onChange={(e) => setApiKeyState(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSetKey() }}
+              />
+              <button onClick={handleSetKey} disabled={!apiKey.trim()}
+                className="text-xs px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:bg-gray-300">
+                确认
+              </button>
+              <button onClick={() => setShowKeyInput(false)}
+                className="text-xs text-gray-400 hover:text-gray-600">取消</button>
+            </div>
+          )}
+        </div>
 
         <InputSection onSubmit={handleDetect} disabled={stage === 'generating' || detectLoading} />
 

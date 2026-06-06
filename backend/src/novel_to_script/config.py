@@ -1,10 +1,26 @@
-"""应用配置 — 从环境变量加载"""
+"""应用配置"""
 
-import os
-from dotenv import load_dotenv
+DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+DEEPSEEK_MODEL = "deepseek-chat"
 
-load_dotenv()
+# API Key 由用户通过前端设置，不在代码中硬编码
+DEEPSEEK_API_KEY = ""
 
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
-DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
-DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+# 内存中的 API Key（用户设置后覆盖）
+_user_api_key: str | None = None
+
+
+def get_api_key() -> str | None:
+    """获取用户设置的 API Key。"""
+    return _user_api_key
+
+
+def set_api_key(key: str) -> None:
+    """设置用户的 API Key。"""
+    global _user_api_key
+    _user_api_key = key
+
+
+def has_api_key() -> bool:
+    """检查用户是否已设置 API Key。"""
+    return bool(_user_api_key)

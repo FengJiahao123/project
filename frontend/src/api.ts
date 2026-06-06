@@ -51,6 +51,24 @@ export async function analyzeOutline(text: string): Promise<OutlineResponse> {
   return resp.json()
 }
 
+export async function checkConfig(): Promise<{ api_key_set: boolean }> {
+  const resp = await fetch(`${BASE}/config`)
+  return resp.json()
+}
+
+export async function setApiKey(apiKey: string): Promise<{ ok: boolean; message: string }> {
+  const resp = await fetch(`${BASE}/config/key`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ api_key: apiKey }),
+  })
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ detail: resp.statusText }))
+    throw new Error(err.detail ?? '设置失败')
+  }
+  return resp.json()
+}
+
 export async function submitRevision(
   script: Script,
   instruction: string,

@@ -12,15 +12,22 @@ from novel_to_script.llm_provider import MockProvider
 async def client():
     """使用 MockProvider 的测试客户端，避免调用真实 API"""
     import novel_to_script.router as router_module
-    original = router_module.llm_provider
+    import novel_to_script.config as config_module
+    original_provider = router_module.llm_provider
+    original_key = config_module.get_api_key()
+    original_ensure = router_module._ensure_provider
     router_module.llm_provider = MockProvider()
+    router_module._ensure_provider = lambda: None  # skip real provider check
+    config_module.set_api_key("test-key")
     try:
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"
         ) as ac:
             yield ac
     finally:
-        router_module.llm_provider = original
+        router_module.llm_provider = original_provider
+        router_module._ensure_provider = original_ensure
+        config_module.set_api_key(original_key or "")
 
 
 async def poll_until_done(client, task_id: str, timeout: float = 5.0):

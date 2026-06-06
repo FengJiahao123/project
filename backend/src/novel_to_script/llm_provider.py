@@ -129,9 +129,10 @@ class MockProvider:
 class DeepSeekProvider:
     """DeepSeek LLM Provider for novel-to-script conversion"""
 
-    def __init__(self):
+    def __init__(self, api_key: str = ""):
+        key = api_key or DEEPSEEK_API_KEY
         self._client = AsyncOpenAI(
-            api_key=DEEPSEEK_API_KEY,
+            api_key=key,
             base_url=DEEPSEEK_BASE_URL,
         )
         self._model = DEEPSEEK_MODEL

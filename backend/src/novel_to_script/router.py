@@ -12,12 +12,37 @@ from novel_to_script.models import (
 from novel_to_script.chapter_splitter import split_chapters
 from novel_to_script.llm_provider import DeepSeekProvider, MockProvider
 from novel_to_script.assembler import assemble_script
-from novel_to_script.config import DEEPSEEK_API_KEY
+from novel_to_script.config import has_api_key, set_api_key, get_api_key
 
 api_router = APIRouter(prefix="/api")
 
 tasks: dict[str, dict] = {}
-llm_provider = DeepSeekProvider() if DEEPSEEK_API_KEY else MockProvider()
+llm_provider = MockProvider()  # 默认使用 Mock，用户设置 Key 后切换
+
+
+def _ensure_provider():
+    """如果用户设置了 Key 且当前是 Mock，切换到真实 Provider。"""
+    global llm_provider
+    if has_api_key() and isinstance(llm_provider, MockProvider):
+        llm_provider = DeepSeekProvider(get_api_key())
+
+
+@api_router.get("/config")
+async def get_config():
+    """返回当前配置状态。"""
+    return {"api_key_set": has_api_key()}
+
+
+@api_router.post("/config/key")
+async def update_api_key(request: dict):
+    """设置用户的 API Key。"""
+    key = request.get("api_key", "").strip()
+    if not key:
+        raise HTTPException(status_code=400, detail="API Key 不能为空")
+    set_api_key(key)
+    global llm_provider
+    llm_provider = DeepSeekProvider(key)
+    return {"ok": True, "message": "API Key 已设置"}
 
 
 async def _process_conversion(
@@ -62,6 +87,9 @@ async def _process_conversion(
 @api_router.post("/convert", response_model=ConvertResponse)
 async def start_conversion(request: ConvertRequest):
     """Submit novel text, return task_id immediately, process in background."""
+    if isinstance(llm_provider, MockProvider) and not has_api_key():
+        raise HTTPException(status_code=400, detail="请先在页面顶部设置 API Key")
+    _ensure_provider()
     chapters = split_chapters(request.text)
 
     if not chapters:
@@ -174,12 +202,15 @@ async def analyze_outline(request: dict):
     text = request.get("text", "")
     if not text.strip():
         raise HTTPException(status_code=400, detail="Text is required")
+    if isinstance(llm_provider, MockProvider) and not has_api_key():
+        raise HTTPException(status_code=400, detail="请先在页面顶部设置 API Key")
 
     chapters = split_chapters(text)
     if not chapters:
         raise HTTPException(status_code=400, detail="No chapters detected")
 
     try:
+        _ensure_provider()
         client = llm_provider._client
         model = llm_provider._model
 
@@ -248,6 +279,9 @@ Return a JSON object (no markdown code blocks):
 @api_router.post("/revision")
 async def revise_script(request: dict):
     """Accept a script JSON + user instruction, return AI-modified script."""
+    if isinstance(llm_provider, MockProvider) and not has_api_key():
+        raise HTTPException(status_code=400, detail="请先在页面顶部设置 API Key")
+    _ensure_provider()
     script_json = request.get("script")
     instruction = request.get("instruction", "")
 
