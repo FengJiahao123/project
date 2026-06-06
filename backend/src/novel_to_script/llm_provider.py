@@ -254,14 +254,14 @@ class DeepSeekProvider:
 
 
 def _build_character(data: dict) -> Character:
-    """Build Character from LLM dict with role mapping."""
+    """Build Character from LLM dict with role mapping, null-safe."""
     return Character(
-        id=data.get("id", ""),
-        name=data.get("name", ""),
-        role=_map_role(data.get("role", "")),
-        description=data.get("description", ""),
-        traits=data.get("traits", []),
-        relationships=data.get("relationships", []),
+        id=data.get("id") or "",
+        name=data.get("name") or "",
+        role=_map_role(data.get("role") or ""),
+        description=data.get("description") or "",
+        traits=(data.get("traits") or []),
+        relationships=(data.get("relationships") or []),
     )
 
 
@@ -324,28 +324,30 @@ def _map_role(role: str) -> str:
 
 
 def _parse_scene(data: dict, scene_number: int) -> Scene:
-    """Convert LLM dict to Scene, with explicit scene_number override."""
+    """Convert LLM dict to Scene, with null-safe defaults."""
     elements = []
-    for el in data.get("elements", []):
-        t = el.get("type", "")
+    for el in (data.get("elements") or []):
+        t = (el.get("type") or "action")
         if t == "action":
-            elements.append(ActionElement(type="action", content=el.get("content", "")))
+            elements.append(ActionElement(type="action", content=el.get("content") or ""))
         elif t == "dialogue":
+            speaker = el.get("speaker") or ""
+            lines = el.get("lines") or []
             elements.append(DialogueElement(
-                type="dialogue", speaker=el.get("speaker", ""),
-                lines=el.get("lines", []),
-                emotion=el.get("emotion", ""),
-                notes=el.get("notes", ""),
+                type="dialogue", speaker=speaker,
+                lines=lines if isinstance(lines, list) else [str(lines)],
+                emotion=el.get("emotion") or "",
+                notes=el.get("notes") or "",
             ))
         elif t == "transition":
-            elements.append(TransitionElement(type="transition", content=el.get("content", "")))
+            elements.append(TransitionElement(type="transition", content=el.get("content") or ""))
     return Scene(
         scene_number=data.get("scene_number", scene_number),
         location=Location(
-            name=data.get("location", {}).get("name", ""),
-            time=data.get("location", {}).get("time", ""),
-            description=data.get("location", {}).get("description", ""),
+            name=(data.get("location") or {}).get("name") or "",
+            time=(data.get("location") or {}).get("time") or "",
+            description=(data.get("location") or {}).get("description") or "",
         ),
-        characters_present=data.get("characters_present", []),
+        characters_present=data.get("characters_present") or [],
         elements=elements,
     )
