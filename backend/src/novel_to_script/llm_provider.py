@@ -11,50 +11,52 @@ from novel_to_script.models import (
 from novel_to_script.config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
 from novel_to_script.assembler import merge_chapter_result
 
-FULL_NOVEL_PROMPT = """You are a professional script adaptation assistant. Convert the following novel into a structured screenplay in YAML-compatible JSON format.
+FULL_NOVEL_PROMPT = """你是一个专业的影视剧本改编专家。请将以下小说完整改编为结构化的剧本。
 
-## Output Format
+## 输出格式
 
-Return a JSON object (no markdown code blocks):
+返回 JSON 对象（不要用 markdown 代码块包裹）：
 
 {
   "characters": [
     {
       "id": "char_001",
-      "name": "Character name",
-      "role": "protagonist/supporting/extra",
-      "description": "Background description",
-      "traits": ["trait1", "trait2"]
+      "name": "角色名",
+      "role": "主角/配角/龙套",
+      "description": "角色背景描述",
+      "traits": ["性格标签"]
     }
   ],
   "scenes": [
     {
       "scene_number": 1,
       "location": {
-        "name": "Location name",
-        "time": "morning/day/night/evening",
-        "description": "Setting description"
+        "name": "场景地点",
+        "time": "清晨/白天/下午/傍晚/夜晚",
+        "description": "环境细节描写"
       },
       "characters_present": ["char_001"],
       "elements": [
-        {"type": "action", "content": "Stage direction or action description"},
-        {"type": "dialogue", "speaker": "char_001", "lines": ["Line 1", "Line 2"], "emotion": "tone", "notes": "performance note"},
-        {"type": "transition", "content": "Transition description"}
+        {"type": "action", "content": "详细的动作或舞台指示"},
+        {"type": "dialogue", "speaker": "char_001", "lines": ["台词第一句", "台词第二句"], "emotion": "语气情绪", "notes": "表演提示"},
+        {"type": "transition", "content": "转场方式"}
       ]
     }
   ]
 }
 
-## Rules
+## 核心规则（非常重要）
 
-1. Read ALL chapters carefully first. Understand the full story, all characters, and all relationships.
-2. Character IDs: char_001, char_002... in order of first appearance across the ENTIRE novel
-3. role must be one of: "protagonist", "supporting", "extra"
-4. elements order by time sequence: mix action, dialogue, transition
-5. dialogue speaker must reference a defined character id
-6. characters_present lists ALL characters in the scene (including silent ones)
-7. Extract REAL character names and dialogue from the text. Do NOT invent.
-8. Return ONLY the JSON object, no extra text."""
+1. **先通读全部章节**，理解完整故事脉络、所有角色和他们的关系
+2. **不要概括或省略**。每个关键情节都要成为独立的场景。一场对话 = 一个场景，一次重要事件 = 一个场景
+3. **每个场景至少 2 个 elements**，包含原文中的真实对话和动作描述
+4. **角色 ID 按出场顺序编号**：char_001, char_002... 全局唯一
+5. role 选其一：主角 / 配角 / 龙套
+6. elements 按剧情时间顺序混合排列 action、dialogue、transition
+7. dialogue 的 speaker 必须引用 characters 中已定义的 id
+8. characters_present 列出本场景所有在场角色（包括没台词但有动作的）
+9. **提取原文中真实的角色名和对话**，不要自己编造
+10. 只返回 JSON，不要任何额外文字"""
 
 
 @runtime_checkable
@@ -146,7 +148,7 @@ class DeepSeekProvider:
                 {"role": "user", "content": user_message},
             ],
             temperature=0.7,
-            max_tokens=8192,
+            max_tokens=16384,
         )
         content = response.choices[0].message.content or ""
         data = _extract_json(content)
@@ -158,7 +160,7 @@ class DeepSeekProvider:
         self, chapters: list[tuple[str, str]], outline: dict | None = None
     ) -> tuple[list[Character], list[Scene]]:
         """Convert entire novel — batch chapters if needed."""
-        BATCH_SIZE = 8
+        BATCH_SIZE = 4
         if len(chapters) <= BATCH_SIZE:
             return await self._convert_batch(chapters, outline, None)
 
@@ -214,7 +216,7 @@ class DeepSeekProvider:
                 {"role": "user", "content": user_msg},
             ],
             temperature=0.7,
-            max_tokens=16384,
+            max_tokens=32768,
         )
         content = response.choices[0].message.content or ""
         data = _extract_json(content)
