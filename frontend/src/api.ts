@@ -65,6 +65,23 @@ export async function apiDeleteProject(projectId: number) {
   return resp.json()
 }
 
+// ====== Revisions ======
+
+export async function apiAddRevision(
+  projectId: number, action: string, scriptJson: string, chapterCount: number, sceneCount: number,
+) {
+  const resp = await fetch(`${BASE}/projects/${projectId}/revisions`, {
+    method: 'POST', headers: headers(),
+    body: JSON.stringify({ action, script_json: scriptJson, chapter_count: chapterCount, scene_count: sceneCount }),
+  })
+  return resp.json()
+}
+
+export async function apiListRevisions(projectId: number) {
+  const resp = await fetch(`${BASE}/projects/${projectId}/revisions`, { headers: headers() })
+  return resp.json()
+}
+
 // ====== Convert ======
 
 export async function submitConvert(

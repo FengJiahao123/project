@@ -4,7 +4,7 @@ import ChapterSelector from './components/ChapterSelector'
 import ResultPanel from './components/ResultPanel'
 import AuthPage from './components/AuthPage'
 import ProjectList from './components/ProjectList'
-import { submitConvert, getStatus, detectChapters, setApiKey, checkConfig, apiCreateProject, apiGetProject, apiSaveProject, apiListProjects } from './api'
+import { submitConvert, getStatus, detectChapters, setApiKey, checkConfig, apiCreateProject, apiGetProject, apiSaveProject, apiListProjects, apiAddRevision } from './api'
 import type { ConvertResponse, ChapterInfo } from './types'
 
 const PHASE_CONFIG = [
@@ -61,10 +61,14 @@ function App() {
   const [result, setResult] = useState<ConvertResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // Save script after each generation completes
+  // Save script + record revision after each generation completes
   useEffect(() => {
     if (result?.status === 'completed' && result.script && projectId) {
-      apiSaveProject(projectId, fullText, JSON.stringify(result.script)).catch(() => {})
+      const json = JSON.stringify(result.script)
+      const sceneCount = result.script.scenes?.length || 0
+      const chapterCount = result.chapters?.length || 0
+      apiSaveProject(projectId, fullText, json).catch(() => {})
+      apiAddRevision(projectId, 'AI 生成', json, chapterCount, sceneCount).catch(() => {})
     }
   }, [result?.status])
 

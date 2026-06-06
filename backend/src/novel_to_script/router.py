@@ -16,6 +16,7 @@ from novel_to_script.config import has_api_key, set_api_key, get_api_key
 from novel_to_script.auth import register_user, login_user, verify_token
 from novel_to_script.projects import (
     create_project, list_projects, get_project, save_project, delete_project,
+    add_revision, list_revisions, get_revision,
 )
 
 api_router = APIRouter(prefix="/api")
@@ -408,3 +409,36 @@ async def api_delete_project(project_id: int, req: Request):
     if not ok:
         raise HTTPException(status_code=404, detail="项目不存在")
     return {"ok": True}
+
+
+# ====== Revisions ======
+
+@api_router.post("/projects/{project_id}/revisions")
+async def api_add_revision(project_id: int, request: dict, req: Request):
+    """记录一次生成/修改"""
+    uid = _get_user_id(req)
+    r = await add_revision(
+        project_id,
+        request.get("action", "生成"),
+        request.get("script_json", ""),
+        request.get("chapter_count", 0),
+        request.get("scene_count", 0),
+    )
+    return r
+
+
+@api_router.get("/projects/{project_id}/revisions")
+async def api_list_revisions(project_id: int, req: Request):
+    """获取项目历史"""
+    uid = _get_user_id(req)
+    return await list_revisions(project_id)
+
+
+@api_router.get("/projects/{project_id}/revisions/{revision_id}")
+async def api_get_revision(project_id: int, revision_id: int, req: Request):
+    """获取某个版本详情"""
+    uid = _get_user_id(req)
+    r = await get_revision(revision_id)
+    if not r:
+        raise HTTPException(status_code=404, detail="版本不存在")
+    return r

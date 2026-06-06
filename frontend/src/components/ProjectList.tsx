@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { apiListProjects, apiDeleteProject } from '../api'
+import { apiListProjects, apiDeleteProject, apiListRevisions } from '../api'
 
 interface Project {
   id: number
@@ -19,9 +19,22 @@ export default function ProjectList({ onOpen, onNew, onLogout, username }: Props
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
 
+  // Expanded project -> its revision list
+  const [expandedId, setExpandedId] = useState<number | null>(null)
+  const [revisions, setRevisions] = useState<Record<number, any[]>>({})
+
   useEffect(() => {
     apiListProjects().then(setProjects).finally(() => setLoading(false))
   }, [])
+
+  const toggleExpand = async (id: number) => {
+    if (expandedId === id) { setExpandedId(null); return }
+    setExpandedId(id)
+    if (!revisions[id]) {
+      const list = await apiListRevisions(id)
+      setRevisions((prev) => ({ ...prev, [id]: list }))
+    }
+  }
 
   const handleDelete = async (id: number) => {
     await apiDeleteProject(id)
@@ -44,23 +57,53 @@ export default function ProjectList({ onOpen, onNew, onLogout, username }: Props
         ) : projects.length === 0 ? (
           <p className="text-center text-gray-400 py-8">还没有项目，点击下方按钮创建</p>
         ) : (
-          <div className="space-y-2 mb-6">
+          <div className="space-y-2 mb-6 max-h-96 overflow-auto">
             {projects.map((p) => (
-              <div
-                key={p.id}
-                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-indigo-50 cursor-pointer transition-colors"
-                onClick={() => onOpen(p.id, p.name)}
-              >
-                <div>
-                  <p className="text-sm font-medium text-gray-800">{p.name}</p>
-                  <p className="text-xs text-gray-400">{p.updated_at.slice(0, 10)}</p>
-                </div>
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleDelete(p.id) }}
-                  className="text-xs text-red-400 hover:text-red-600"
+              <div key={p.id}>
+                <div
+                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-indigo-50 cursor-pointer transition-colors"
+                  onClick={() => toggleExpand(p.id)}
                 >
-                  删除
-                </button>
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">{p.name}</p>
+                    <p className="text-xs text-gray-400">
+                      {p.updated_at?.slice(0, 10)}
+                      {revisions[p.id]?.length > 0 && (
+                        <span className="ml-2 text-indigo-500">{revisions[p.id].length} 个版本</span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onOpen(p.id, p.name) }}
+                      className="text-xs text-indigo-600 hover:text-indigo-800"
+                    >打开</button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDelete(p.id) }}
+                      className="text-xs text-red-400 hover:text-red-600"
+                    >删除</button>
+                  </div>
+                </div>
+
+                {/* Revision history */}
+                {expandedId === p.id && revisions[p.id] && (
+                  <div className="ml-4 mt-1 mb-2 border-l-2 border-indigo-100 pl-4 space-y-1">
+                    {revisions[p.id].length === 0 ? (
+                      <p className="text-xs text-gray-400 py-1">暂无记录</p>
+                    ) : (
+                      revisions[p.id].slice(0, 5).map((r: any) => (
+                        <div key={r.id} className="flex items-center gap-2 text-xs text-gray-500 py-0.5">
+                          <span className="text-gray-300">{r.created_at?.slice(0, 10)}</span>
+                          <span className="font-medium text-gray-600">{r.summary}</span>
+                          <span className="text-gray-400">{r.action}</span>
+                        </div>
+                      ))
+                    )}
+                    {revisions[p.id].length > 5 && (
+                      <p className="text-xs text-gray-400">... 还有 {revisions[p.id].length - 5} 个版本</p>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
