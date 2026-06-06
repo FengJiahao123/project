@@ -23,6 +23,31 @@ export async function apiLogin(username: string, password: string) {
   return data
 }
 
+export async function apiGetProfile() {
+  const resp = await fetch(`${BASE}/auth/me`, { headers: headers() })
+  return resp.json()
+}
+
+export async function apiUpdateProfile(displayName: string) {
+  const resp = await fetch(`${BASE}/auth/profile`, {
+    method: 'POST', headers: headers(),
+    body: JSON.stringify({ display_name: displayName }),
+  })
+  return resp.json()
+}
+
+export async function apiChangePassword(oldPassword: string, newPassword: string) {
+  const resp = await fetch(`${BASE}/auth/password`, {
+    method: 'POST', headers: headers(),
+    body: JSON.stringify({ old_password: oldPassword, new_password: newPassword }),
+  })
+  if (!resp.ok) {
+    const data = await resp.json()
+    throw new Error(data.detail || '修改失败')
+  }
+  return resp.json()
+}
+
 export async function apiRegister(username: string, password: string) {
   const resp = await fetch(`${BASE}/auth/register`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },

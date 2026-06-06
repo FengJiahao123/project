@@ -83,3 +83,58 @@ async def login_user(username: str, password: str) -> dict:
         return {"ok": True, "message": "登录成功", "token": token, "username": row["username"]}
     finally:
         await db.close()
+
+
+async def get_user_profile(user_id: int) -> dict:
+    """获取用户信息 + 统计数据"""
+    db = await get_db()
+    try:
+        cur = await db.execute("SELECT username, display_name, created_at FROM users WHERE id = ?", (user_id,))
+        user = await cur.fetchone()
+        if not user:
+            return {"ok": False}
+        cur2 = await db.execute("SELECT COUNT(*) as c FROM projects WHERE user_id = ?", (user_id,))
+        project_count = (await cur2.fetchone())["c"]
+        cur3 = await db.execute(
+            "SELECT COUNT(*) as c FROM revisions r INNER JOIN projects p ON r.project_id = p.id WHERE p.user_id = ?",
+            (user_id,),
+        )
+        revision_count = (await cur3.fetchone())["c"]
+        return {
+            "ok": True,
+            "username": user["username"],
+            "display_name": user["display_name"] or user["username"],
+            "created_at": user["created_at"],
+            "project_count": project_count,
+            "revision_count": revision_count,
+        }
+    finally:
+        await db.close()
+
+
+async def update_profile(user_id: int, display_name: str = "") -> dict:
+    """更新用户资料"""
+    db = await get_db()
+    try:
+        await db.execute("UPDATE users SET display_name = ? WHERE id = ?", (display_name.strip(), user_id))
+        await db.commit()
+        return {"ok": True}
+    finally:
+        await db.close()
+
+
+async def change_password(user_id: int, old_password: str, new_password: str) -> dict:
+    """修改密码"""
+    if len(new_password) < 4:
+        return {"ok": False, "message": "新密码至少 4 位"}
+    db = await get_db()
+    try:
+        cur = await db.execute("SELECT password_hash FROM users WHERE id = ?", (user_id,))
+        row = await cur.fetchone()
+        if not row or row["password_hash"] != hash_password(old_password):
+            return {"ok": False, "message": "原密码错误"}
+        await db.execute("UPDATE users SET password_hash = ? WHERE id = ?", (hash_password(new_password), user_id))
+        await db.commit()
+        return {"ok": True, "message": "密码已修改"}
+    finally:
+        await db.close()

@@ -5,6 +5,7 @@ import ResultPanel from './components/ResultPanel'
 import AuthPage from './components/AuthPage'
 import ProjectList from './components/ProjectList'
 import Icon from './components/Icon'
+import SettingsPage from './components/SettingsPage'
 import { submitConvert, getStatus, detectChapters, setApiKey, checkConfig, apiCreateProject, apiGetProject, apiSaveProject, apiListProjects, apiAddRevision, apiGetRevision } from './api'
 import type { ConvertResponse, ChapterInfo } from './types'
 
@@ -44,8 +45,9 @@ function App() {
   }
   const onLogout = handleLogout
 
-  // User menu
+  // User menu + settings
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
 
   const handleNewProject = async () => {
     const name = prompt('项目名称：') || '未命名项目'
@@ -307,6 +309,9 @@ function App() {
                       <p className="text-[11px] text-warm-gray-light mt-0.5">{apiKeySet ? <>Key ···{apiKey.slice(-4)}</> : '未设置 API Key'}</p>
                     </div>
                     <div className="py-1">
+                      <button className="dropdown-item" onClick={() => { setShowUserMenu(false); setShowSettings(true) }}>
+                        <Icon name="settings" size={14} /><span>个人设置</span>
+                      </button>
                       <button className="dropdown-item" onClick={() => { setShowUserMenu(false); setShowKeyInput(true) }}>
                         <Icon name="key" size={14} /><span>{apiKeySet ? '更换 API Key' : '设置 API Key'}</span>
                       </button>
@@ -429,6 +434,16 @@ function App() {
           <ResultPanel script={result.script} />
         )}
       </div>
+
+      {/* ===== Settings Modal ===== */}
+      {showSettings && (
+        <SettingsPage
+          username={username}
+          onClose={() => setShowSettings(false)}
+          onLogout={onLogout}
+        />
+      )}
+
     </div>
   )
 }

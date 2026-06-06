@@ -13,7 +13,7 @@ from novel_to_script.chapter_splitter import split_chapters
 from novel_to_script.llm_provider import DeepSeekProvider, MockProvider
 from novel_to_script.assembler import assemble_script
 from novel_to_script.config import has_api_key, set_api_key, get_api_key
-from novel_to_script.auth import register_user, login_user, verify_token
+from novel_to_script.auth import register_user, login_user, verify_token, get_user_profile, update_profile, change_password
 from novel_to_script.projects import (
     create_project, list_projects, get_project, save_project, delete_project,
     add_revision, list_revisions, get_revision,
@@ -356,10 +356,28 @@ async def api_login(request: dict):
 
 @api_router.get("/auth/me")
 async def api_me(req: Request):
-    """获取当前用户信息"""
+    """获取当前用户信息 + 统计"""
     uid = _get_user_id(req)
-    payload = verify_token(req.headers["Authorization"][7:])
-    return {"user_id": uid, "username": payload["username"]}
+    return await get_user_profile(uid)
+
+
+@api_router.post("/auth/profile")
+async def api_update_profile(request: dict, req: Request):
+    """更新用户资料"""
+    uid = _get_user_id(req)
+    return await update_profile(uid, request.get("display_name", ""))
+
+
+@api_router.post("/auth/password")
+async def api_change_password(request: dict, req: Request):
+    """修改密码"""
+    uid = _get_user_id(req)
+    result = await change_password(
+        uid, request.get("old_password", ""), request.get("new_password", ""),
+    )
+    if not result["ok"]:
+        raise HTTPException(status_code=400, detail=result.get("message", "修改失败"))
+    return result
 
 
 # ====== Projects ======

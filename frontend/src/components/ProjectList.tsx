@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { apiListProjects, apiDeleteProject, apiListRevisions } from '../api'
 import Icon from './Icon'
+import SettingsPage from './SettingsPage'
 
 interface Project {
   id: number; name: string; created_at: string; updated_at: string
@@ -20,6 +21,7 @@ export default function ProjectList({ onOpen, onOpenRevision, onNew, onLogout, u
   const [expandedId, setExpandedId] = useState<number | null>(null)
   const [revisions, setRevisions] = useState<Record<number, any[]>>({})
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
 
   useEffect(() => { apiListProjects().then(setProjects).finally(() => setLoading(false)) }, [])
   useEffect(() => {
@@ -55,6 +57,10 @@ export default function ProjectList({ onOpen, onOpenRevision, onNew, onLogout, u
                     <p className="text-[11px] text-warm-gray-light mt-0.5">创作工坊 · 个人账户</p>
                   </div>
                   <div className="py-1">
+                    <button className="dropdown-item" onClick={() => { setUserMenuOpen(false); setShowSettings(true) }}>
+                      <Icon name="settings" size={14} /><span>个人设置</span>
+                    </button>
+                    <div className="dropdown-divider" />
                     <button className="dropdown-item" onClick={() => { setUserMenuOpen(false); onLogout() }}>
                       <Icon name="logOut" size={14} /><span>退出登录</span>
                     </button>
@@ -154,6 +160,11 @@ export default function ProjectList({ onOpen, onOpenRevision, onNew, onLogout, u
           </>
         )}
       </div>
+
+      {/* Settings */}
+      {showSettings && (
+        <SettingsPage username={username} onClose={() => setShowSettings(false)} onLogout={onLogout} />
+      )}
     </div>
   )
 }
