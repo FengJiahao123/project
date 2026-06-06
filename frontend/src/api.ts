@@ -33,6 +33,7 @@ export async function apiRegister(username: string, password: string) {
 
 export async function apiListProjects() {
   const resp = await fetch(`${BASE}/projects`, { headers: headers() })
+  if (!resp.ok) throw new Error('Unauthorized')
   return resp.json()
 }
 

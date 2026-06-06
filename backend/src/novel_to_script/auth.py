@@ -1,12 +1,22 @@
 """用户认证模块"""
 
 import hashlib
+import os
 import secrets
 import jwt
 import time
 from novel_to_script.database import get_db
 
-JWT_SECRET = secrets.token_hex(32)
+# 持久化 JWT 密钥，服务重启后 token 依然有效
+_SECRET_FILE = os.path.join(os.path.dirname(__file__), "..", "..", "data", ".jwt_secret")
+os.makedirs(os.path.dirname(_SECRET_FILE), exist_ok=True)
+if os.path.exists(_SECRET_FILE):
+    JWT_SECRET = open(_SECRET_FILE).read().strip()
+else:
+    JWT_SECRET = secrets.token_hex(32)
+    with open(_SECRET_FILE, "w") as f:
+        f.write(JWT_SECRET)
+
 JWT_EXPIRY = 7 * 24 * 3600  # 7 days
 
 
