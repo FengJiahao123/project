@@ -4,6 +4,7 @@ import ChapterSelector from './components/ChapterSelector'
 import ResultPanel from './components/ResultPanel'
 import AuthPage from './components/AuthPage'
 import ProjectList from './components/ProjectList'
+import Icon from './components/Icon'
 import { submitConvert, getStatus, detectChapters, setApiKey, checkConfig, apiCreateProject, apiGetProject, apiSaveProject, apiListProjects, apiAddRevision, apiGetRevision } from './api'
 import type { ConvertResponse, ChapterInfo } from './types'
 
@@ -39,8 +40,12 @@ function App() {
   }
   const handleLogout = () => {
     localStorage.removeItem('token'); localStorage.removeItem('username')
-    setToken(null); setUsername('')
+    setToken(null); setUsername(''); setView('projects')
   }
+  const onLogout = handleLogout
+
+  // User menu
+  const [showUserMenu, setShowUserMenu] = useState(false)
 
   const handleNewProject = async () => {
     const name = prompt('项目名称：') || '未命名项目'
@@ -268,44 +273,76 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen" style={{background: '#faf8f5'}}>
-      {/* ==== Top Nav ==== */}
-      <nav className="sticky top-0 z-40 bg-cream/80 backdrop-blur-sm border-b border-border">
+    <div className="min-h-screen bg-paper">
+      {/* ===== Top Nav ===== */}
+      <nav className="sticky top-0 z-40 bg-cream/85 backdrop-blur-md border-b border-border">
         <div className="max-w-4xl mx-auto px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button onClick={handleBackToProjects} className="text-xs text-warm-gray-light hover:text-ink transition-colors">
-              ← 项目列表
+          <div className="flex items-center gap-3">
+            <button onClick={handleBackToProjects} className="text-xs text-warm-gray-light hover:text-ink transition-colors flex items-center gap-1">
+              <Icon name="chevronLeft" size={14} />项目列表
             </button>
             <span className="text-border select-none">|</span>
             <h1 className="font-serif text-base font-bold text-ink">{projectName}</h1>
           </div>
-          <div className="flex items-center gap-3">
-            {apiKeySet ? (
-              <button onClick={() => setShowKeyInput(true)} className="text-xs text-warm-gray-light bg-soft-amber/60 px-2.5 py-1 rounded-full hover:bg-soft-amber transition-colors">
-                Key ···{apiKey.slice(-4)}
-              </button>
-            ) : (
-              <button onClick={() => setShowKeyInput(true)} className="text-xs text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full">
-                设置 API Key
+
+          <div className="flex items-center gap-2">
+            {!apiKeySet && (
+              <button onClick={() => setShowKeyInput(true)}
+                className="flex items-center gap-1 text-xs text-amber-700 bg-amber-50 hover:bg-amber-100 px-2.5 py-1.5 rounded-full transition-colors">
+                <Icon name="key" size={12} />设置 API Key
               </button>
             )}
+            {/* User dropdown */}
+            <div className="relative">
+              <button onClick={() => setShowUserMenu(!showUserMenu)}
+                className="w-8 h-8 rounded-full bg-ink/8 flex items-center justify-center hover:bg-ink/12 transition-colors text-ink/60">
+                <Icon name="user" size={15} />
+              </button>
+              {showUserMenu && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowUserMenu(false)} />
+                  <div className="absolute right-0 top-full mt-2 w-56 bg-ivory border border-border rounded-xl shadow-xl z-50 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-border">
+                      <p className="text-sm font-medium text-ink">{username}</p>
+                      <p className="text-[11px] text-warm-gray-light mt-0.5">{apiKeySet ? <>Key ···{apiKey.slice(-4)}</> : '未设置 API Key'}</p>
+                    </div>
+                    <div className="py-1">
+                      <button className="dropdown-item" onClick={() => { setShowUserMenu(false); setShowKeyInput(true) }}>
+                        <Icon name="key" size={14} /><span>{apiKeySet ? '更换 API Key' : '设置 API Key'}</span>
+                      </button>
+                      <div className="dropdown-divider" />
+                      <button className="dropdown-item" onClick={() => { setShowUserMenu(false); onLogout() }}>
+                        <Icon name="logOut" size={14} /><span>退出登录</span>
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </nav>
 
-      {/* ==== API Key inline ==== */}
+      {/* ===== API Key Modal ===== */}
       {showKeyInput && (
-        <div className="max-w-4xl mx-auto px-6 pt-3">
-          <div className="card-warm p-3 flex items-center gap-3">
-            <span className="text-xs text-warm-gray-light shrink-0">API Key</span>
-            <input className="flex-1 text-xs px-2.5 py-1.5 border border-border rounded-lg outline-none focus:border-warm-gray-light font-mono"
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20" onClick={() => setShowKeyInput(false)}>
+          <div className="bg-ivory rounded-2xl shadow-2xl p-6 w-full max-w-md mx-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center"><Icon name="key" size={15} className="text-amber-700" /></div>
+              <h3 className="font-serif text-base font-semibold text-ink">设置 API Key</h3>
+            </div>
+            <p className="text-xs text-warm-gray-light mb-4">输入 DeepSeek API Key，用于驱动 AI 转换引擎。Key 仅保存在当前服务器内存中，不会持久化到磁盘。</p>
+            <input className="w-full px-3 py-2.5 border border-border rounded-lg text-sm font-mono outline-none focus:border-ink mb-3"
               type="password" placeholder="sk-..." value={apiKey}
               onChange={(e) => setApiKeyState(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleSetKey() }}
             />
-            <button onClick={handleSetKey} disabled={!apiKey.trim()}
-              className="text-xs px-3 py-1.5 bg-ink text-white rounded-lg hover:bg-accent-hover disabled:opacity-50 transition-colors">保存</button>
-            <button onClick={() => { setShowKeyInput(false); setApiKeyState('') }} className="text-xs text-warm-gray-light hover:text-ink">取消</button>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => { setShowKeyInput(false); setApiKeyState('') }}
+                className="px-4 py-2 text-xs text-warm-gray hover:text-ink transition-colors">取消</button>
+              <button onClick={handleSetKey} disabled={!apiKey.trim()}
+                className="px-4 py-2 bg-ink text-white text-xs rounded-lg hover:bg-accent-hover disabled:opacity-50 transition-colors">保存并启用</button>
+            </div>
           </div>
         </div>
       )}

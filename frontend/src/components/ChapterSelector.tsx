@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import type { ChapterInfo } from '../types'
+import Icon from './Icon'
 
 interface Props {
   chapters: ChapterInfo[]
@@ -56,7 +57,7 @@ export default function ChapterSelector({ chapters, onSubmit, onCancel }: Props)
             {overLimit && <span className="text-merlot ml-2">建议 ≤ {MAX_RECOMMENDED.toLocaleString()} 字</span>}
           </p>
         </div>
-        <button onClick={onCancel} className="text-xs text-warm-gray-light hover:text-ink transition-colors">取消</button>
+        <button onClick={onCancel} className="text-xs text-warm-gray-light hover:text-ink transition-colors flex items-center gap-1"><Icon name="chevronLeft" size={12} />返回</button>
       </div>
 
       {/* Quick tools */}
