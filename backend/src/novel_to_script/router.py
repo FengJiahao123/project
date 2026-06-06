@@ -1,9 +1,9 @@
-"""FastAPI routes — /api/convert, /api/status, /api/outline, /api/revision"""
+"""FastAPI routes — /api/convert, /api/status, /api/outline, /api/revision, /api/auth, /api/projects"""
 
 import asyncio
 import json
 import uuid
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from novel_to_script.models import (
     ConvertRequest,
     ConvertResponse,
@@ -13,6 +13,10 @@ from novel_to_script.chapter_splitter import split_chapters
 from novel_to_script.llm_provider import DeepSeekProvider, MockProvider
 from novel_to_script.assembler import assemble_script
 from novel_to_script.config import has_api_key, set_api_key, get_api_key
+from novel_to_script.auth import register_user, login_user, verify_token
+from novel_to_script.projects import (
+    create_project, list_projects, get_project, save_project, delete_project,
+)
 
 api_router = APIRouter(prefix="/api")
 
@@ -316,3 +320,91 @@ async def revise_script(request: dict):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI revision failed: {str(e)}")
+
+
+# ====== Auth ======
+
+def _get_user_id(request: Request) -> int:
+    """从 Authorization header 提取 user_id"""
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="需要登录")
+    payload = verify_token(auth[7:])
+    if not payload:
+        raise HTTPException(status_code=401, detail="登录已过期")
+    return payload["user_id"]
+
+
+@api_router.post("/auth/register")
+async def api_register(request: dict):
+    """注册"""
+    result = await register_user(request.get("username", ""), request.get("password", ""))
+    if not result["ok"]:
+        raise HTTPException(status_code=400, detail=result["message"])
+    return result
+
+
+@api_router.post("/auth/login")
+async def api_login(request: dict):
+    """登录"""
+    result = await login_user(request.get("username", ""), request.get("password", ""))
+    if not result["ok"]:
+        raise HTTPException(status_code=400, detail=result["message"])
+    return result
+
+
+@api_router.get("/auth/me")
+async def api_me(req: Request):
+    """获取当前用户信息"""
+    uid = _get_user_id(req)
+    payload = verify_token(req.headers["Authorization"][7:])
+    return {"user_id": uid, "username": payload["username"]}
+
+
+# ====== Projects ======
+
+@api_router.post("/projects")
+async def api_create_project(request: dict, req: Request):
+    """创建项目"""
+    uid = _get_user_id(req)
+    name = request.get("name", "未命名项目")
+    text = request.get("text", "")
+    result = await create_project(uid, name, text)
+    return result
+
+
+@api_router.get("/projects")
+async def api_list_projects(req: Request):
+    """列出项目"""
+    uid = _get_user_id(req)
+    return await list_projects(uid)
+
+
+@api_router.get("/projects/{project_id}")
+async def api_get_project(project_id: int, req: Request):
+    """获取项目"""
+    uid = _get_user_id(req)
+    proj = await get_project(uid, project_id)
+    if not proj:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    return proj
+
+
+@api_router.put("/projects/{project_id}")
+async def api_save_project(project_id: int, request: dict, req: Request):
+    """保存项目"""
+    uid = _get_user_id(req)
+    text = request.get("text", "")
+    script_json = request.get("script_json", "")
+    await save_project(uid, project_id, text, script_json)
+    return {"ok": True}
+
+
+@api_router.delete("/projects/{project_id}")
+async def api_delete_project(project_id: int, req: Request):
+    """删除项目"""
+    uid = _get_user_id(req)
+    ok = await delete_project(uid, project_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    return {"ok": True}

@@ -2,7 +2,9 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import InputSection from './components/InputSection'
 import ChapterSelector from './components/ChapterSelector'
 import ResultPanel from './components/ResultPanel'
-import { submitConvert, getStatus, detectChapters, setApiKey, checkConfig } from './api'
+import AuthPage from './components/AuthPage'
+import ProjectList from './components/ProjectList'
+import { submitConvert, getStatus, detectChapters, setApiKey, checkConfig, apiCreateProject, apiGetProject, apiSaveProject } from './api'
 import type { ConvertResponse, ChapterInfo } from './types'
 
 const PHASE_CONFIG = [
@@ -12,9 +14,47 @@ const PHASE_CONFIG = [
 ]
 
 function App() {
+  // ====== Auth ======
+  const [token, setToken] = useState(localStorage.getItem('token'))
+  const [username, setUsername] = useState(localStorage.getItem('username') || '')
+  const [view, setView] = useState<'projects' | 'editor'>('projects')
+  const [projectId, setProjectId] = useState<number | null>(null)
+  const [projectName, setProjectName] = useState('')
+
+  const handleLogin = (t: string, name: string) => {
+    setToken(t); setUsername(name); setView('projects')
+  }
+  const handleLogout = () => {
+    localStorage.removeItem('token'); localStorage.removeItem('username')
+    setToken(null); setUsername('')
+  }
+
+  const handleNewProject = async () => {
+    const name = prompt('项目名称：') || '未命名项目'
+    const result = await apiCreateProject(name)
+    if (result.ok) {
+      setProjectId(result.project_id); setProjectName(name); setView('editor')
+    }
+  }
+
+  const handleOpenProject = async (id: number, name: string) => {
+    const proj = await apiGetProject(id)
+    setProjectId(id); setProjectName(name)
+    if (proj.original_text) setFullText(proj.original_text)
+    setView('editor')
+  }
+
+  // ====== App State ======
   const [stage, setStage] = useState<'input' | 'chapterSelect' | 'generating' | 'done'>('input')
   const [result, setResult] = useState<ConvertResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  // Save script after each generation completes
+  useEffect(() => {
+    if (result?.status === 'completed' && result.script && projectId) {
+      apiSaveProject(projectId, fullText, JSON.stringify(result.script)).catch(() => {})
+    }
+  }, [result?.status])
 
   // API Key
   const [apiKey, setApiKeyState] = useState('')
@@ -154,6 +194,12 @@ function App() {
     return () => { stopPolling(); clearAnim() }
   }, [stopPolling, clearAnim])
 
+  // ====== Auth gate ======
+  if (!token) return <AuthPage onLogin={handleLogin} />
+  if (view === 'projects') {
+    return <ProjectList onOpen={handleOpenProject} onNew={handleNewProject} onLogout={handleLogout} username={username} />
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-4xl mx-auto py-8 px-4">
@@ -162,7 +208,7 @@ function App() {
             🎬 AI 小说转剧本工具
           </h1>
           <p className="text-gray-500">
-            将小说文本自动转换为结构化 YAML 剧本格式
+            {projectName} | <button onClick={() => setView('projects')} className="text-indigo-600 hover:text-indigo-800">返回项目列表</button>
           </p>
         </header>
 
@@ -174,44 +220,31 @@ function App() {
               <button
                 onClick={() => setShowKeyInput(true)}
                 className="text-gray-400 hover:text-gray-600 ml-1"
-              >
-                （更换）
-              </button>
+              >（更换）</button>
             </div>
           ) : (
             <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 px-4 py-2 rounded-lg">
               <span className="text-xs text-amber-700 font-medium">⚠️ 请设置 DeepSeek API Key：</span>
               <input
                 className="text-xs px-2 py-1 border border-gray-300 rounded w-64 font-mono"
-                type="password"
-                placeholder="sk-..."
-                value={apiKey}
+                type="password" placeholder="sk-..." value={apiKey}
                 onChange={(e) => setApiKeyState(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') handleSetKey() }}
               />
-              <button
-                onClick={handleSetKey}
-                disabled={!apiKey.trim()}
-                className="text-xs px-3 py-1 bg-amber-600 text-white rounded hover:bg-amber-700 disabled:bg-gray-300 transition-colors"
-              >
-                保存
-              </button>
+              <button onClick={handleSetKey} disabled={!apiKey.trim()}
+                className="text-xs px-3 py-1 bg-amber-600 text-white rounded hover:bg-amber-700 disabled:bg-gray-300 transition-colors">保存</button>
             </div>
           )}
           {showKeyInput && apiKeySet && (
             <div className="flex items-center gap-2 ml-2">
               <input
-                className="text-xs px-2 py-1 border border-gray-300 rounded w-48 font-mono"
-                type="password"
-                placeholder="输入新 Key..."
-                value={apiKey}
+                className="text-xs px-2 py-1 border border-gray-300 rounded w-48 font-mono" type="password"
+                placeholder="输入新 Key..." value={apiKey}
                 onChange={(e) => setApiKeyState(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') handleSetKey() }}
               />
               <button onClick={handleSetKey} disabled={!apiKey.trim()}
-                className="text-xs px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:bg-gray-300">
-                确认
-              </button>
+                className="text-xs px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:bg-gray-300">确认</button>
               <button onClick={() => setShowKeyInput(false)}
                 className="text-xs text-gray-400 hover:text-gray-600">取消</button>
             </div>
@@ -229,8 +262,7 @@ function App() {
 
         {stage === 'chapterSelect' && chapters.length > 0 && (
           <ChapterSelector
-            chapters={chapters}
-            onSubmit={handleStartConvert}
+            chapters={chapters} onSubmit={handleStartConvert}
             onCancel={() => { setStage('input'); setChapters([]) }}
           />
         )}
@@ -242,18 +274,14 @@ function App() {
               <span className="text-sm font-mono text-indigo-600">{Math.round(displayProgress)}%</span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2.5">
-              <div
-                className="bg-indigo-600 h-2.5 rounded-full transition-all duration-300 ease-linear"
-                style={{ width: `${displayProgress}%` }}
-              />
+              <div className="bg-indigo-600 h-2.5 rounded-full transition-all duration-300 ease-linear"
+                style={{ width: `${displayProgress}%` }} />
             </div>
           </div>
         )}
 
         {error && (
-          <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-            ❌ {error}
-          </div>
+          <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">❌ {error}</div>
         )}
 
         {stage === 'done' && result?.script && (

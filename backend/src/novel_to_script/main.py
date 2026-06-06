@@ -1,12 +1,22 @@
 """AI 小说转剧本工具 — FastAPI 入口"""
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from novel_to_script.database import init_db
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await init_db()
+    yield
+
 
 app = FastAPI(
     title="AI 小说转剧本工具",
     description="将小说文本自动转换为结构化 YAML 剧本",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(

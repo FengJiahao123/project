@@ -2,12 +2,76 @@ import type { ConvertResponse, RevisionResponse, OutlineResponse, Script, Chapte
 
 const BASE = '/api'
 
+function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem('token')
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
+function headers(): Record<string, string> {
+  return { 'Content-Type': 'application/json', ...authHeaders() }
+}
+
+// ====== Auth ======
+
+export async function apiLogin(username: string, password: string) {
+  const resp = await fetch(`${BASE}/auth/login`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  })
+  return resp.json()
+}
+
+export async function apiRegister(username: string, password: string) {
+  const resp = await fetch(`${BASE}/auth/register`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  })
+  return resp.json()
+}
+
+// ====== Projects ======
+
+export async function apiListProjects() {
+  const resp = await fetch(`${BASE}/projects`, { headers: headers() })
+  return resp.json()
+}
+
+export async function apiCreateProject(name: string, text: string = '') {
+  const resp = await fetch(`${BASE}/projects`, {
+    method: 'POST', headers: headers(),
+    body: JSON.stringify({ name, text }),
+  })
+  return resp.json()
+}
+
+export async function apiGetProject(projectId: number) {
+  const resp = await fetch(`${BASE}/projects/${projectId}`, { headers: headers() })
+  return resp.json()
+}
+
+export async function apiSaveProject(projectId: number, text: string, scriptJson: string) {
+  const resp = await fetch(`${BASE}/projects/${projectId}`, {
+    method: 'PUT', headers: headers(),
+    body: JSON.stringify({ text, script_json: scriptJson }),
+  })
+  return resp.json()
+}
+
+export async function apiDeleteProject(projectId: number) {
+  const resp = await fetch(`${BASE}/projects/${projectId}`, {
+    method: 'DELETE', headers: headers(),
+  })
+  return resp.json()
+}
+
+// ====== Convert ======
+
 export async function submitConvert(
   text: string, outline?: OutlineResponse, chapterIndices?: number[]
 ): Promise<ConvertResponse> {
   const resp = await fetch(`${BASE}/convert`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: headers(),
     body: JSON.stringify({ text, outline: outline || null, chapter_indices: chapterIndices || null }),
   })
   if (!resp.ok) {
@@ -28,7 +92,7 @@ export async function getStatus(taskId: string): Promise<ConvertResponse> {
 export async function detectChapters(text: string): Promise<ChaptersResponse> {
   const resp = await fetch(`${BASE}/chapters`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: headers(),
     body: JSON.stringify({ text }),
   })
   if (!resp.ok) {
@@ -41,7 +105,7 @@ export async function detectChapters(text: string): Promise<ChaptersResponse> {
 export async function analyzeOutline(text: string): Promise<OutlineResponse> {
   const resp = await fetch(`${BASE}/outline`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: headers(),
     body: JSON.stringify({ text }),
   })
   if (!resp.ok) {
@@ -59,7 +123,7 @@ export async function checkConfig(): Promise<{ api_key_set: boolean }> {
 export async function setApiKey(apiKey: string): Promise<{ ok: boolean; message: string }> {
   const resp = await fetch(`${BASE}/config/key`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: headers(),
     body: JSON.stringify({ api_key: apiKey }),
   })
   if (!resp.ok) {
@@ -75,7 +139,7 @@ export async function submitRevision(
 ): Promise<RevisionResponse> {
   const resp = await fetch(`${BASE}/revision`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: headers(),
     body: JSON.stringify({ script, instruction }),
   })
   if (!resp.ok) {
