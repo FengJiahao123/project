@@ -18,7 +18,9 @@ export async function apiLogin(username: string, password: string) {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
   })
-  return resp.json()
+  const data = await resp.json()
+  if (!resp.ok) return { ok: false, message: data.detail || '登录失败' }
+  return data
 }
 
 export async function apiRegister(username: string, password: string) {
@@ -26,7 +28,9 @@ export async function apiRegister(username: string, password: string) {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
   })
-  return resp.json()
+  const data = await resp.json()
+  if (!resp.ok) return { ok: false, message: data.detail || '注册失败' }
+  return data
 }
 
 // ====== Projects ======
