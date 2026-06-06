@@ -1,4 +1,4 @@
-"""FastAPI routes — /api/convert and /api/status"""
+"""FastAPI routes — /api/convert, /api/status, /api/outline, /api/revision"""
 
 import asyncio
 import json
@@ -26,8 +26,6 @@ async def _process_conversion(task_id: str, text: str):
         chapters = split_chapters(text)
         chapter_titles = [title for title, _ in chapters]
         tasks[task_id]["chapters"] = chapter_titles
-
-        # Single call — LLM sees all chapters at once
         tasks[task_id]["status"] = "processing"
         tasks[task_id]["progress"] = 5
 
@@ -98,6 +96,100 @@ async def get_status(task_id: str):
     )
 
 
+# ====== Outline Analysis ======
+
+OUTLINE_PROMPT = """You are a professional script analyst. Read the entire novel and produce a scene breakdown outline.
+
+## Output Format
+
+Return a JSON object (no markdown code blocks):
+
+{
+  "chapter_outlines": [
+    {
+      "chapter_title": "Chapter title",
+      "scenes": [
+        {
+          "scene_number": 1,
+          "location_name": "Location name",
+          "time": "morning/day/night/evening",
+          "summary": "What happens in this scene (2-3 sentences)",
+          "key_dialogue_preview": "Short preview of key dialogue if any",
+          "characters_involved": ["Character Name"]
+        }
+      ]
+    }
+  ],
+  "character_preview": [
+    {
+      "name": "Character name",
+      "role_guess": "protagonist/supporting/extra",
+      "brief_intro": "One-line description",
+      "first_appearance_scene": 1
+    }
+  ],
+  "total_scenes": 9,
+  "analysis_notes": "Brief notes about the novel structure and adaptation suggestions"
+}
+
+## Rules
+
+1. Read ALL chapters before producing the outline
+2. Each scene should be a self-contained unit with clear beginning/end
+3. Character names must be from the actual novel text
+4. scene_number sequential across all chapters
+5. Return ONLY valid JSON, no extra text"""
+
+
+@api_router.post("/outline")
+async def analyze_outline(request: dict):
+    """Quick structural analysis — returns scene breakdown + character preview."""
+    text = request.get("text", "")
+    if not text.strip():
+        raise HTTPException(status_code=400, detail="Text is required")
+
+    chapters = split_chapters(text)
+    if not chapters:
+        raise HTTPException(status_code=400, detail="No chapters detected")
+
+    try:
+        client = llm_provider._client
+        model = llm_provider._model
+
+        # Truncate each chapter to ~2000 chars for fast analysis
+        parts = []
+        for title, content in chapters:
+            truncated = content[:2000] + ("..." if len(content) > 2000 else "")
+            parts.append(f"## {title}\n\n{truncated}")
+        full_text = "\n\n---\n\n".join(parts)
+
+        resp = await client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": OUTLINE_PROMPT},
+                {"role": "user", "content": f"Analyze this novel and produce a scene breakdown outline:\n\n{full_text}"},
+            ],
+            temperature=0.5,
+            max_tokens=4096,
+        )
+        content = resp.choices[0].message.content or ""
+
+        from novel_to_script.llm_provider import _extract_json
+        data = _extract_json(content)
+
+        return {
+            "chapter_outlines": data.get("chapter_outlines", []),
+            "character_preview": data.get("character_preview", []),
+            "total_scenes": data.get("total_scenes", 0),
+            "analysis_notes": data.get("analysis_notes", ""),
+            "chapter_titles": [title for title, _ in chapters],
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Outline analysis failed: {str(e)}")
+
+
+# ====== AI Revision ======
+
 REVISION_PROMPT = """You are a professional script editor. Given a complete script in JSON format and a user's revision instruction, modify the script accordingly.
 
 ## Rules
@@ -115,8 +207,8 @@ Return a JSON object (no markdown code blocks):
 
 {
   "modified_script": { ... full script JSON ... },
-  "message": "修改说明 in Chinese",
-  "changes_summary": ["变更1", "变更2"]
+  "message": "Summary of changes in Chinese",
+  "changes_summary": ["Change 1", "Change 2"]
 }"""
 
 
@@ -152,7 +244,7 @@ async def revise_script(request: dict):
 
         return {
             "modified_script": data.get("modified_script", script_json),
-            "message": data.get("message", "修改完成"),
+            "message": data.get("message", ""),
             "changes_summary": data.get("changes_summary", []),
         }
     except Exception as e:

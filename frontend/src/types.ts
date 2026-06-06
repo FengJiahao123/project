@@ -64,3 +64,34 @@ export interface RevisionResponse {
   message: string
   changes_summary: string[]
 }
+
+// ====== 大纲分析 ======
+
+export interface OutlineScene {
+  scene_number: number
+  location_name: string
+  time: string
+  summary: string
+  key_dialogue_preview?: string
+  characters_involved: string[]
+}
+
+export interface ChapterOutline {
+  chapter_title: string
+  scenes: OutlineScene[]
+}
+
+export interface CharacterPreview {
+  name: string
+  role_guess: string
+  brief_intro: string
+  first_appearance_scene: number
+}
+
+export interface OutlineResponse {
+  chapter_outlines: ChapterOutline[]
+  character_preview: CharacterPreview[]
+  total_scenes: number
+  analysis_notes: string
+  chapter_titles: string[]
+}
