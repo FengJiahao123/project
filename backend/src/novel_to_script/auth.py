@@ -62,8 +62,11 @@ async def register_user(username: str, password: str) -> dict:
         row = await user.fetchone()
         token = create_token(row["id"], username.strip())
         return {"ok": True, "message": "注册成功", "token": token, "username": username.strip()}
-    except Exception:
-        return {"ok": False, "message": "用户名已存在"}
+    except Exception as e:
+        msg = str(e)
+        if "UNIQUE" in msg.upper():
+            return {"ok": False, "message": "用户名已存在"}
+        return {"ok": False, "message": f"注册失败：{msg[:50]}"}
     finally:
         await db.close()
 
