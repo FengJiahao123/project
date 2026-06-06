@@ -47,7 +47,7 @@ export default function ProjectList({ onOpen, onOpenRevision, onNew, onLogout, u
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-lg">
+      <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-xl">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-xl font-bold text-indigo-700">🎬 我的项目</h1>
           <div className="flex items-center gap-3">
@@ -119,7 +119,7 @@ export default function ProjectList({ onOpen, onOpenRevision, onNew, onLogout, u
                         >
                           <span className="text-gray-300 shrink-0 mt-0.5">{r.created_at?.slice(5, 10)}</span>
                           <div className="flex-1 min-w-0">
-                            <div className="font-medium text-gray-800 truncate">
+                            <div className="font-medium text-gray-800 break-all">
                               📖 {r.summary || `版本 ${r.version}`}
                             </div>
                             <div className="flex items-center gap-2 mt-0.5 text-gray-400">
