@@ -90,7 +90,7 @@ export default function ProjectList({ onOpen, onOpenRevision, onNew, onLogout, u
                         onClick={(e) => { e.stopPropagation(); onOpen(p.id, p.name) }}
                         className="text-xs px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
                       >
-                        进入编辑
+                        新建转化
                       </button>
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDelete(p.id) }}
