@@ -8,9 +8,9 @@ import { submitConvert, getStatus, detectChapters, setApiKey, checkConfig, apiCr
 import type { ConvertResponse, ChapterInfo } from './types'
 
 const PHASE_CONFIG = [
-  { max: 35, speed: 0.12, label: '📖 正在阅读理解全文...' },
-  { max: 70, speed: 0.08, label: '🔍 正在分析角色与场景...' },
-  { max: 90, speed: 0.04, label: '✍️ 正在生成剧本...' },
+  { max: 35, speed: 0.12, label: '正在理解全文脉络' },
+  { max: 70, speed: 0.08, label: '正在分析角色与场景' },
+  { max: 90, speed: 0.04, label: '正在编写剧本内容' },
 ]
 
 function App() {
@@ -158,7 +158,7 @@ function App() {
     clearAnim()
     realDoneRef.current = false
     setDisplayProgress(0)
-    setPhaseLabel('📖 正在阅读理解全文...')
+    setPhaseLabel('正在理解全文脉络')
     animTimerRef.current = setInterval(() => {
       setDisplayProgress((prev) => {
         if (realDoneRef.current) {
@@ -202,7 +202,7 @@ function App() {
   const handleStartConvert = async (selectedIndices: number[]) => {
     setStage('generating')
     setDisplayProgress(0)
-    setPhaseLabel('📖 正在阅读理解全文...')
+    setPhaseLabel('正在理解全文脉络')
     startAnimation()
 
     try {
@@ -231,7 +231,7 @@ function App() {
             setTimeout(() => {
               clearAnim()
               setDisplayProgress(100)
-              setPhaseLabel('✅ 转换完成')
+              setPhaseLabel('转换完成')
               setStage('done')
             }, 2000)
           } else if (status.status === 'error') {
@@ -268,76 +268,86 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen" style={{background: 'linear-gradient(180deg, #faf8f5 0%, #f5f0e8 100%)'}}>
-      <div className="max-w-3xl mx-auto py-10 px-4">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <button onClick={handleBackToProjects} className="text-xs text-warm-gray-light hover:text-ink transition-colors mb-2 block">
-              ← 返回项目列表
+    <div className="min-h-screen" style={{background: '#faf8f5'}}>
+      {/* ==== Top Nav ==== */}
+      <nav className="sticky top-0 z-40 bg-cream/80 backdrop-blur-sm border-b border-border">
+        <div className="max-w-4xl mx-auto px-6 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button onClick={handleBackToProjects} className="text-xs text-warm-gray-light hover:text-ink transition-colors">
+              ← 项目列表
             </button>
-            <h1 className="font-serif text-2xl font-bold text-ink">{projectName}</h1>
+            <span className="text-border select-none">|</span>
+            <h1 className="font-serif text-base font-bold text-ink">{projectName}</h1>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             {apiKeySet ? (
-              <span className="text-xs text-warm-gray-light bg-soft-amber px-2.5 py-1 rounded-full">Key 已设置</span>
+              <button onClick={() => setShowKeyInput(true)} className="text-xs text-warm-gray-light bg-soft-amber/60 px-2.5 py-1 rounded-full hover:bg-soft-amber transition-colors">
+                Key ···{apiKey.slice(-4)}
+              </button>
             ) : (
-              <button onClick={() => setShowKeyInput(true)} className="text-xs text-warm-gray-light hover:text-ink underline">
+              <button onClick={() => setShowKeyInput(true)} className="text-xs text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full">
                 设置 API Key
               </button>
             )}
           </div>
         </div>
+      </nav>
 
-        {/* API Key input (collapsed) */}
-        {showKeyInput && !apiKeySet && (
-          <div className="card-warm p-4 mb-4 flex items-center gap-3">
-            <span className="text-xs text-warm-gray shrink-0">DeepSeek API Key：</span>
-            <input className="flex-1 text-xs px-3 py-1.5 border border-border rounded outline-none focus:border-warm-gray-light font-mono"
+      {/* ==== API Key inline ==== */}
+      {showKeyInput && (
+        <div className="max-w-4xl mx-auto px-6 pt-3">
+          <div className="card-warm p-3 flex items-center gap-3">
+            <span className="text-xs text-warm-gray-light shrink-0">API Key</span>
+            <input className="flex-1 text-xs px-2.5 py-1.5 border border-border rounded-lg outline-none focus:border-warm-gray-light font-mono"
               type="password" placeholder="sk-..." value={apiKey}
               onChange={(e) => setApiKeyState(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleSetKey() }}
             />
             <button onClick={handleSetKey} disabled={!apiKey.trim()}
-              className="text-xs px-3 py-1.5 bg-ink text-white rounded hover:bg-accent-hover disabled:opacity-50 transition-colors">保存</button>
-            <button onClick={() => setShowKeyInput(false)} className="text-xs text-warm-gray-light hover:text-ink">取消</button>
-          </div>
-        )}
-
-        {showKeyInput && apiKeySet && (
-          <div className="card-warm p-4 mb-4 flex items-center gap-3">
-            <span className="text-xs text-warm-gray">更换 Key：</span>
-            <input className="flex-1 text-xs px-3 py-1.5 border border-border rounded outline-none focus:border-warm-gray-light font-mono"
-              type="password" placeholder="sk-..." value={apiKey}
-              onChange={(e) => setApiKeyState(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleSetKey() }}
-            />
-            <button onClick={handleSetKey} disabled={!apiKey.trim()}
-              className="text-xs px-3 py-1.5 bg-ink text-white rounded hover:bg-accent-hover disabled:opacity-50 transition-colors">保存</button>
+              className="text-xs px-3 py-1.5 bg-ink text-white rounded-lg hover:bg-accent-hover disabled:opacity-50 transition-colors">保存</button>
             <button onClick={() => { setShowKeyInput(false); setApiKeyState('') }} className="text-xs text-warm-gray-light hover:text-ink">取消</button>
           </div>
+        </div>
+      )}
+
+      {/* ==== Main Content ==== */}
+      <div className="max-w-3xl mx-auto py-8 px-4">
+        {/* Step indicator */}
+        <div className="flex items-center gap-3 mb-6 text-xs">
+          <span className={`px-2.5 py-1 rounded-full ${stage === 'input' || stage === 'chapterSelect' ? 'bg-ink text-white' : 'bg-soft-amber text-warm-gray'}`}>1</span>
+          <span className="text-warm-gray-light">上传小说</span>
+          <span className="text-border mx-1">→</span>
+          <span className={`px-2.5 py-1 rounded-full ${stage === 'chapterSelect' ? 'bg-ink text-white' : stage === 'generating' || stage === 'done' ? 'bg-soft-amber text-warm-gray' : 'bg-soft-amber text-warm-gray'}`}>2</span>
+          <span className="text-warm-gray-light">选择章节</span>
+          <span className="text-border mx-1">→</span>
+          <span className={`px-2.5 py-1 rounded-full ${stage === 'generating' || stage === 'done' ? 'bg-ink text-white' : 'bg-soft-amber text-warm-gray'}`}>3</span>
+          <span className="text-warm-gray-light">生成剧本</span>
+        </div>
+
+        {/* Step 1: Input */}
+        {(stage === 'input' || stage === 'chapterSelect' || stage === 'generating') && (
+          <InputSection onSubmit={handleDetect} disabled={detectLoading || stage === 'generating'} showCompact={stage !== 'input'} />
         )}
 
-        <InputSection onSubmit={handleDetect} disabled={stage === 'generating' || detectLoading} />
-
         {detectLoading && (
-          <div className="card-warm p-6 mt-6 text-center">
-            <p className="text-sm text-warm-gray">正在检测章节...</p>
+          <div className="card-warm p-8 mt-6 text-center">
+            <div className="w-6 h-6 border-2 border-ink/20 border-t-ink rounded-full animate-spin mx-auto mb-3" />
+            <p className="text-sm text-warm-gray">正在分析章节结构...</p>
           </div>
         )}
 
+        {/* Step 2: Chapter Select */}
         {stage === 'chapterSelect' && chapters.length > 0 && (
           <ChapterSelector chapters={chapters} onSubmit={handleStartConvert}
             onCancel={() => { setStage('input'); setChapters([]) }} />
         )}
 
+        {/* Step 3: Generating */}
         {stage === 'generating' && (
-          <div className="card-warm p-6 mt-6">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm text-warm-gray">{phaseLabel || '准备中...'}</h3>
-              <span className="text-sm font-mono text-ink/60">{Math.round(displayProgress)}%</span>
-            </div>
-            <div className="w-full bg-soft-amber rounded-full h-1.5">
+          <div className="card-warm p-8 mt-6 text-center">
+            <p className="font-serif text-base text-ink mb-1">{phaseLabel || '正在生成剧本...'}</p>
+            <p className="text-sm text-warm-gray-light">{Math.round(displayProgress)}%</p>
+            <div className="w-full bg-soft-amber rounded-full h-1.5 mt-5 max-w-xs mx-auto">
               <div className="bg-ink h-1.5 rounded-full transition-all duration-300 ease-linear"
                 style={{ width: `${displayProgress}%` }} />
             </div>
@@ -345,9 +355,10 @@ function App() {
         )}
 
         {error && (
-          <div className="card-warm p-4 mt-6 text-sm text-merlot">{error}</div>
+          <div className="card-warm p-4 mt-6 text-sm text-red-600 border-red-200">{error}</div>
         )}
 
+        {/* Result */}
         {stage === 'done' && result?.script && (
           <ResultPanel script={result.script} />
         )}
