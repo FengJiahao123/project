@@ -2,12 +2,13 @@ import { useState } from 'react'
 import yaml from 'js-yaml'
 import type { Script } from '../types'
 import YAMLPreview from './YAMLPreview'
+import ScriptPreview from './ScriptPreview'
 
 interface Props {
   script: Script
 }
 
-type Tab = 'yaml' | 'characters' | 'stats'
+type Tab = 'yaml' | 'characters' | 'stats' | 'script'
 
 export default function ResultPanel({ script }: Props) {
   const [tab, setTab] = useState<Tab>('yaml')
@@ -16,6 +17,7 @@ export default function ResultPanel({ script }: Props) {
     { key: 'yaml', label: '📄 YAML 预览' },
     { key: 'characters', label: '👤 角色表' },
     { key: 'stats', label: '📊 场景统计' },
+    { key: 'script', label: '📜 剧本预览' },
   ]
 
   const handleDownload = () => {
@@ -132,6 +134,8 @@ export default function ResultPanel({ script }: Props) {
           <StatCard label="对话数" value={dialogueCount.toString()} />
         </div>
       )}
+
+      {tab === 'script' && <ScriptPreview script={script} />}
     </div>
   )
 }
