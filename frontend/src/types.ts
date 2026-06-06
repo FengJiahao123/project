@@ -49,6 +49,7 @@ export interface Script {
 // ====== API 类型 ======
 
 export interface ConvertResponse {
+  task_id: string | null
   status: 'pending' | 'processing' | 'completed' | 'error'
   progress: number
   chapters: string[]

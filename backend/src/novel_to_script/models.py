@@ -82,6 +82,7 @@ class ConvertRequest(BaseModel):
 
 
 class ConvertResponse(BaseModel):
+    task_id: str | None = Field(default=None, description="任务 ID，用于轮询进度")
     status: Literal["pending", "processing", "completed", "error"] = Field(
         ..., description="转换状态"
     )

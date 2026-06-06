@@ -1,15 +1,42 @@
-import { useState } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import InputSection from './components/InputSection'
 import ChapterList from './components/ChapterList'
 import ProgressDisplay from './components/ProgressDisplay'
 import ResultPanel from './components/ResultPanel'
-import { submitConvert } from './api'
+import { submitConvert, getStatus } from './api'
 import type { ConvertResponse } from './types'
 
 function App() {
   const [result, setResult] = useState<ConvertResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const stopPolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current)
+      pollingRef.current = null
+    }
+  }, [])
+
+  const startPolling = useCallback((taskId: string) => {
+    stopPolling()
+    pollingRef.current = setInterval(async () => {
+      try {
+        const status = await getStatus(taskId)
+        setResult(status)
+
+        if (status.status === 'completed' || status.status === 'error') {
+          stopPolling()
+          setLoading(false)
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : '获取进度失败')
+        stopPolling()
+        setLoading(false)
+      }
+    }, 500)
+  }, [stopPolling])
 
   const handleSubmit = async (text: string) => {
     setLoading(true)
@@ -17,11 +44,18 @@ function App() {
     setResult(null)
 
     try {
-      const response = await submitConvert(text)
-      setResult(response)
+      const initial = await submitConvert(text)
+      // 立即显示初始状态（章节列表 + 0% 进度）
+      setResult(initial)
+
+      if (initial.task_id) {
+        startPolling(initial.task_id)
+      } else {
+        // 降级：没有 task_id，可能直接完成了
+        setLoading(false)
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : '未知错误')
-    } finally {
       setLoading(false)
     }
   }
@@ -57,7 +91,7 @@ function App() {
           </div>
         )}
 
-        {result?.status === 'completed' && result.script && (
+        {!loading && result?.status === 'completed' && result.script && (
           <ResultPanel script={result.script} />
         )}
       </div>
