@@ -68,7 +68,8 @@ function App() {
       const sceneCount = result.script.scenes?.length || 0
       const chapterCount = result.chapters?.length || 0
       apiSaveProject(projectId, fullText, json).catch(() => {})
-      apiAddRevision(projectId, 'AI 生成', json, chapterCount, sceneCount).catch(() => {})
+      const chapterNames = (result.chapters || []).join(', ')
+      apiAddRevision(projectId, 'AI 生成', json, chapterCount, sceneCount, chapterNames).catch(() => {})
     }
   }, [result?.status])
 

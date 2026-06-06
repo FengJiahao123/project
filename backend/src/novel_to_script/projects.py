@@ -80,7 +80,7 @@ async def delete_project(user_id: int, project_id: int) -> bool:
 
 async def add_revision(
     project_id: int, action: str, script_json: str = "",
-    chapter_count: int = 0, scene_count: int = 0,
+    chapter_count: int = 0, scene_count: int = 0, chapter_names: str = "",
 ) -> dict:
     """记录一次生成/修改"""
     db = await get_db()
@@ -100,8 +100,8 @@ async def add_revision(
             summary += f" · {scene_count}场景"
 
         await db.execute(
-            "INSERT INTO revisions (project_id, version, action, summary, script_json, chapter_count, scene_count) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (project_id, version, action, summary, script_json, chapter_count, scene_count),
+            "INSERT INTO revisions (project_id, version, action, summary, script_json, chapter_count, scene_count, chapter_names) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (project_id, version, action, summary, script_json, chapter_count, scene_count, chapter_names),
         )
 
         # 同步更新 projects 表

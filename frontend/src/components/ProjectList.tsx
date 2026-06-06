@@ -92,10 +92,17 @@ export default function ProjectList({ onOpen, onNew, onLogout, username }: Props
                       <p className="text-xs text-gray-400 py-1">暂无记录</p>
                     ) : (
                       revisions[p.id].slice(0, 5).map((r: any) => (
-                        <div key={r.id} className="flex items-center gap-2 text-xs text-gray-500 py-0.5">
-                          <span className="text-gray-300">{r.created_at?.slice(0, 10)}</span>
-                          <span className="font-medium text-gray-600">{r.summary}</span>
-                          <span className="text-gray-400">{r.action}</span>
+                        <div key={r.id} className="text-xs text-gray-500 py-0.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-gray-300">{r.created_at?.slice(0, 10)}</span>
+                            <span className="font-medium text-gray-600">{r.summary}</span>
+                            <span className="text-gray-400">{r.action}</span>
+                          </div>
+                          {r.chapter_names && (
+                            <div className="text-gray-400 ml-2 mt-0.5 truncate max-w-xs">
+                              📖 {r.chapter_names}
+                            </div>
+                          )}
                         </div>
                       ))
                     )}

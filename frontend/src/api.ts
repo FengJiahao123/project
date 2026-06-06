@@ -69,10 +69,11 @@ export async function apiDeleteProject(projectId: number) {
 
 export async function apiAddRevision(
   projectId: number, action: string, scriptJson: string, chapterCount: number, sceneCount: number,
+  chapterNames: string = '',
 ) {
   const resp = await fetch(`${BASE}/projects/${projectId}/revisions`, {
     method: 'POST', headers: headers(),
-    body: JSON.stringify({ action, script_json: scriptJson, chapter_count: chapterCount, scene_count: sceneCount }),
+    body: JSON.stringify({ action, script_json: scriptJson, chapter_count: chapterCount, scene_count: sceneCount, chapter_names: chapterNames }),
   })
   return resp.json()
 }

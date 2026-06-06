@@ -48,6 +48,7 @@ async def init_db():
                 script_json TEXT DEFAULT '',
                 chapter_count INTEGER DEFAULT 0,
                 scene_count INTEGER DEFAULT 0,
+                chapter_names TEXT DEFAULT '',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
             );
