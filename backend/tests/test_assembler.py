@@ -196,7 +196,7 @@ class TestAssembleScript:
                 elements=[],
             ),
         ]
-        with pytest.raises(ValueError, match="不存在的角色 ID"):
+        with pytest.raises(ValueError, match="不存在的角色"):
             assemble_script(meta, [], scenes)
 
 

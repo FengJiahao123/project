@@ -46,10 +46,8 @@ def merge_chapter_result(
     for c in new_characters:
         name_key = c.name.strip()
         if name_key in name_to_id:
-            # 角色已存在 → 映射到已有 ID
             id_map[c.id] = name_to_id[name_key]
         else:
-            # 新角色 → 分配新 ID
             new_id = f"char_{next_num:03d}"
             id_map[c.id] = new_id
             name_to_id[name_key] = new_id
@@ -57,14 +55,16 @@ def merge_chapter_result(
             c.id = new_id
             merged_chars.append(c)
 
-    # 4. 更新新场景中的角色 ID 引用
+    # 4. 更新新场景中的角色 ID 引用 + name→id fallback
     for scene in new_scenes:
         scene.characters_present = [
-            id_map.get(cid, cid) for cid in scene.characters_present
+            name_to_id.get(cid, id_map.get(cid, cid)) for cid in scene.characters_present
         ]
         for elem in scene.elements:
             if elem.type == "dialogue":
-                elem.speaker = id_map.get(elem.speaker, elem.speaker)
+                # 先按 ID 映射，失败则按角色名映射，最后保留原值
+                mapped = id_map.get(elem.speaker) or name_to_id.get(elem.speaker.strip(), elem.speaker)
+                elem.speaker = mapped
 
     # 5. 更新新增角色中 relationships 的 target 引用
     for c in merged_chars:
@@ -96,27 +96,50 @@ def assemble_script(
     Raises:
         ValueError: 场景引用了不存在的角色 ID
     """
-    # 角色去重（按 id，保留首次出现）
+    # 角色去重（按 id，保留首次出现）+ 构建 name→id 映射
     seen_ids: set[str] = set()
     unique_chars: list[Character] = []
+    name_to_id: dict[str, str] = {}
     for char in all_characters:
+        name_to_id[char.name.strip()] = char.id
         if char.id not in seen_ids:
             seen_ids.add(char.id)
             unique_chars.append(char)
 
-    # 校验角色引用
+    # 修复+校验角色引用：speaker 可能是人名而非 ID，用 name_to_id 自动修正
+    for scene in all_scenes:
+        # Fix characters_present
+        fixed_present = []
+        for cid in scene.characters_present:
+            if cid in seen_ids:
+                fixed_present.append(cid)
+            elif cid.strip() in name_to_id:
+                fixed_present.append(name_to_id[cid.strip()])
+            else:
+                fixed_present.append(cid)  # keep as-is, will raise below if invalid
+        scene.characters_present = fixed_present
+
+        for element in scene.elements:
+            if element.type == "dialogue":
+                speaker = element.speaker
+                if speaker in seen_ids:
+                    continue  # valid
+                # Try name match
+                name_key = speaker.strip()
+                if name_key in name_to_id:
+                    element.speaker = name_to_id[name_key]
+                    continue
+                raise ValueError(
+                    f"场景 {scene.scene_number} 的对话引用了不存在的角色: {speaker}"
+                )
+
+    # 校验 characters_present 引用
     for scene in all_scenes:
         for char_id in scene.characters_present:
             if char_id not in seen_ids:
                 raise ValueError(
-                    f"场景 {scene.scene_number} 引用了不存在的角色 ID: {char_id}"
+                    f"场景 {scene.scene_number} 引用了不存在的角色: {char_id}"
                 )
-        for element in scene.elements:
-            if element.type == "dialogue":
-                if element.speaker not in seen_ids:
-                    raise ValueError(
-                        f"场景 {scene.scene_number} 的对话引用了不存在的角色 ID: {element.speaker}"
-                    )
 
     # 重新编号场景
     for i, scene in enumerate(all_scenes, start=1):

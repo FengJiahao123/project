@@ -87,7 +87,7 @@ FULL_NOVEL_PROMPT = """你是一个专业的剧本转写专家。你的任务是
 
 1. 角色 ID char_001, char_002... 按首次出场顺序
 2. role 必须是：主角/配角/龙套
-3. speaker 引用 characters 中已定义的 id
+3. speaker 必须使用 characters 中已定义的 id（如 char_001），绝对不允许使用角色名、昵称或描述文字作为 speaker
 4. 真实角色名、真实对话，不编造
 5. 先通读全文再开始写
 6. 只返回 JSON，不返回其他文字"""
