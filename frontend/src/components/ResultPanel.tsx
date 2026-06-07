@@ -3,13 +3,12 @@ import yaml from 'js-yaml'
 import type { Script } from '../types'
 import YAMLPreview from './YAMLPreview'
 import ScriptPreview from './ScriptPreview'
-import RelationshipGraph from './RelationshipGraph'
 import SceneCards from './SceneCards'
 import { toFountain } from '../utils/fountain'
 
 interface Props { script: Script }
 
-type Tab = 'yaml' | 'characters' | 'stats' | 'script' | 'graph' | 'cards'
+type Tab = 'yaml' | 'characters' | 'stats' | 'script' | 'cards'
 
 export default function ResultPanel({ script: initialScript }: Props) {
   const [tab, setTab] = useState<Tab>('script')
@@ -20,8 +19,7 @@ export default function ResultPanel({ script: initialScript }: Props) {
   const tabs: { key: Tab; label: string }[] = [
     { key: 'script', label: '剧本预览' },
     { key: 'cards', label: '场景卡片' },
-    { key: 'graph', label: '角色关系' },
-    { key: 'characters', label: '角色列表' },
+    { key: 'characters', label: '角色表' },
     { key: 'stats', label: '统计' },
     { key: 'yaml', label: 'YAML' },
   ]
@@ -91,7 +89,6 @@ export default function ResultPanel({ script: initialScript }: Props) {
 
       {tab === 'cards' && <SceneCards script={script} onReorder={handleReorder} />}
       {tab === 'script' && <ScriptPreview script={script} onScriptUpdate={handleScriptUpdate} />}
-      {tab === 'graph' && <RelationshipGraph script={script} />}
     </div>
   )
 }
