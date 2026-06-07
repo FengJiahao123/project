@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import { submitRevision } from '../api'
+import { toFountain } from '../utils/fountain'
 import type { Script } from '../types'
 
 interface Props {
@@ -134,6 +135,15 @@ export default function ScriptPreview({ script, onScriptUpdate }: Props) {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  const handleFountainExport = () => {
+    const fountain = toFountain(script)
+    const blob = new Blob([fountain], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `${script.meta.title || 'script'}.fountain`
+    a.click(); URL.revokeObjectURL(url)
+  }
+
   const handlePrint = () => {
     const text = buildTextScript()
     const w = window.open('', '_blank', 'width=800,height=600')
@@ -263,6 +273,10 @@ export default function ScriptPreview({ script, onScriptUpdate }: Props) {
           <button onClick={() => setChatOpen(!chatOpen)} title="用 AI 自然语言修改剧本"
             className={`text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${chatOpen ? 'bg-ink text-white border-ink' : 'bg-white text-warm-gray border-border hover:border-warm-gray-light'}`}>
             AI 协作
+          </button>
+          <button onClick={handleFountainExport} title="导出为 Fountain 格式（可导入 Final Draft）"
+            className="text-xs px-2.5 py-1.5 bg-white text-warm-gray rounded-lg border border-border hover:border-warm-gray-light transition-colors">
+            Fountain
           </button>
         </div>
       </div>
