@@ -309,12 +309,16 @@ function App() {
           </div>
 
           <div className="flex items-center gap-2">
-            {!apiKeySet && (
-              <button onClick={() => setShowKeyInput(true)}
-                className="flex items-center gap-1 text-xs text-amber-700 bg-amber-50 hover:bg-amber-100 px-2.5 py-1.5 rounded-full transition-colors">
-                <Icon name="key" size={12} />设置 API Key
-              </button>
-            )}
+            {/* API Key — always visible */}
+            <button onClick={() => setShowKeyInput(true)}
+              className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full transition-colors ${
+                apiKeySet
+                  ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                  : 'bg-amber-100 text-amber-700 hover:bg-amber-200 animate-pulse'
+              }`}>
+              <span className={`w-2 h-2 rounded-full ${apiKeySet ? 'bg-green-500' : 'bg-amber-500'}`} />
+              {apiKeySet ? 'Key 已设置' : '设置 API Key'}
+            </button>
             {/* User dropdown */}
             <div className="relative">
               <button onClick={() => setShowUserMenu(!showUserMenu)}
@@ -369,32 +373,6 @@ function App() {
               <button onClick={handleSetKey} disabled={!apiKey.trim()}
                 className="px-4 py-2 bg-ink text-white text-xs rounded-lg hover:bg-accent-hover disabled:opacity-50 transition-colors">保存并启用</button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* ===== API Key Card — inline, cannot miss ===== */}
-      {!apiKeySet && (
-        <div className="card-warm p-6 mt-6 border-2 border-amber-400 bg-amber-50/30">
-          <div className="text-center mb-4">
-            <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-2">
-              <Icon name="key" size={22} className="text-amber-700" />
-            </div>
-            <h3 className="font-serif text-lg font-bold text-amber-900">开始使用前需要设置 API Key</h3>
-            <p className="text-sm text-amber-700 mt-1">输入你的 DeepSeek API Key，仅在当前会话使用，不存盘</p>
-          </div>
-          <div className="flex items-center gap-2 max-w-md mx-auto">
-            <input
-              className="flex-1 px-4 py-3 border-2 border-amber-400 rounded-lg font-mono text-sm outline-none focus:border-amber-600 bg-white"
-              type="password" placeholder="sk-..." value={apiKey}
-              onChange={(e) => setApiKeyState(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleSetKey() }}
-              autoFocus
-            />
-            <button onClick={handleSetKey} disabled={!apiKey.trim()}
-              className="px-6 py-3 bg-amber-600 text-white text-sm font-bold rounded-lg hover:bg-amber-700 disabled:opacity-50 transition-colors whitespace-nowrap">
-              启用
-            </button>
           </div>
         </div>
       )}
