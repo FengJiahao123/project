@@ -7,7 +7,7 @@ import ProjectList from './components/ProjectList'
 import Icon from './components/Icon'
 import SettingsPage from './components/SettingsPage'
 import { submitConvert, getStatus, detectChapters, setApiKey, checkConfig, apiCreateProject, apiGetProject, apiSaveProject, apiListProjects, apiAddRevision, apiGetRevision } from './api'
-import type { ConvertResponse, ChapterInfo } from './types'
+import type { ConvertResponse, ChapterInfo, Script } from './types'
 
 const PHASE_CONFIG = [
   { max: 35, speed: 0.12, label: '正在理解全文脉络' },
@@ -70,7 +70,7 @@ function App() {
 
   const handleOpenProject = async (id: number, name: string) => {
     setProjectId(id); setProjectName(name)
-    currentRevisionId.current = 0   // 新会话，新版本
+    currentRevisionId.current = 0; editingRevisionId.current = 0
     setStage('input'); setResult(null); setError(null)
     setChapters([]); setFullText(''); setDisplayProgress(0); setPhaseLabel('')
     clearAnim(); stopPolling()
@@ -86,8 +86,11 @@ function App() {
     clearAnim(); stopPolling()
   }
 
+  const editingRevisionId = useRef(0)  // Track which revision we're editing
+
   const handleOpenRevision = async (id: number, name: string, revisionId: number) => {
     isViewingHistory.current = true
+    editingRevisionId.current = revisionId
     setProjectId(id); setProjectName(name)
     setStage('done')
     try {
@@ -104,6 +107,17 @@ function App() {
       setError('加载历史版本失败')
     }
     setView('editor')
+  }
+
+  // Save edited script back to DB
+  const handleScriptSave = async (script: Script) => {
+    if (!projectId) return
+    const json = JSON.stringify(script)
+    const sceneCount = script.scenes?.length || 0
+    const chapterNames = (result?.chapters || []).join(', ')
+    const chapterCount = result?.chapters?.length || 0
+    await apiSaveProject(projectId, fullText, json)
+    await apiAddRevision(projectId, '编辑', json, chapterCount, sceneCount, chapterNames, editingRevisionId.current || 0)
   }
 
   // ====== App State ======
@@ -435,7 +449,7 @@ function App() {
 
         {/* Result */}
         {stage === 'done' && result?.script && (
-          <ResultPanel script={result.script} />
+          <ResultPanel script={result.script} onSave={handleScriptSave} />
         )}
       </div>
 

@@ -6,11 +6,11 @@ import ScriptPreview from './ScriptPreview'
 import SceneCards from './SceneCards'
 import { toFountain } from '../utils/fountain'
 
-interface Props { script: Script }
+interface Props { script: Script; onSave?: (script: Script) => void }
 
 type Tab = 'yaml' | 'characters' | 'stats' | 'script' | 'cards'
 
-export default function ResultPanel({ script: initialScript }: Props) {
+export default function ResultPanel({ script: initialScript, onSave }: Props) {
   const [tab, setTab] = useState<Tab>('script')
   const [script, setScript] = useState<Script>(initialScript)
 
@@ -24,8 +24,8 @@ export default function ResultPanel({ script: initialScript }: Props) {
     { key: 'yaml', label: 'YAML' },
   ]
 
-  const handleScriptUpdate = (updated: Script) => setScript(updated)
-  const handleReorder = (scenes: Script['scenes']) => setScript((prev) => ({ ...prev, scenes }))
+  const handleScriptUpdate = (updated: Script) => { setScript(updated); onSave?.(updated) }
+  const handleReorder = (scenes: Script['scenes']) => { const u = { ...script, scenes }; setScript(u); onSave?.(u) }
 
   const handleFountainDownload = () => {
     const text = toFountain(script)
