@@ -244,7 +244,7 @@ class DeepSeekProvider:
                 {"role": "user", "content": user_msg},
             ],
             temperature=0.7,
-            max_tokens=32768,
+            max_tokens=65536,
         )
         content = response.choices[0].message.content or ""
         data = _extract_json(content)
@@ -310,6 +310,50 @@ def _extract_json(text: str) -> dict:
                 return json.loads(stripped[start:end + 1])
             except json.JSONDecodeError:
                 pass
+
+    # 6: auto-repair truncated JSON (incomplete last field stripped, brackets closed LIFO)
+    if start != -1:
+        chunk = t[start:]
+
+        def _close_brackets(s: str) -> str:
+            """Close unclosed brackets in LIFO order."""
+            # Walk through s, tracking the stack of openers
+            stack = []
+            for ch in s:
+                if ch == '{': stack.append('}')
+                elif ch == '}':
+                    if stack and stack[-1] == '}': stack.pop()
+                elif ch == '[': stack.append(']')
+                elif ch == ']':
+                    if stack and stack[-1] == ']': stack.pop()
+            return s + ''.join(reversed(stack))
+
+        # 6a: Strip back to last comma, close brackets, try parse
+        last_comma = chunk.rfind(',')
+        if last_comma > 0:
+            trial = _close_brackets(chunk[:last_comma])
+            try:
+                return json.loads(trial)
+            except json.JSONDecodeError:
+                pass
+
+        # 6b: Strip to last closing bracket + open new brackets
+        last_brace = chunk.rfind('}')
+        last_bracket = chunk.rfind(']')
+        last_closer = max(last_brace, last_bracket)
+        if last_closer > 0:
+            trial = _close_brackets(chunk[:last_closer + 1])
+            try:
+                return json.loads(trial)
+            except json.JSONDecodeError:
+                pass
+
+        # 6c: Just close brackets on full chunk
+        trial = _close_brackets(chunk)
+        try:
+            return json.loads(trial)
+        except json.JSONDecodeError:
+            pass
 
     raise ValueError(f"Cannot parse JSON from LLM response: {text[:300]}...")
 
