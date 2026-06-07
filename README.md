@@ -147,7 +147,7 @@ scenes:
 
 ## Demo 视频
 
-[待录制]
+[![小说转剧本工坊 Demo](https://img.shields.io/badge/Bilibili-观看视频-00A1D6?logo=bilibili)](https://www.bilibili.com/video/BV1hpEs6uER5/)
 
 ## 依赖说明
 
