@@ -1,144 +1,126 @@
-"""FastAPI routes — /api/convert, /api/status, /api/outline, /api/revision, /api/auth, /api/projects"""
+"""FastAPI routes — user-isolated LLM, projects, auth"""
 
 import asyncio
 import json
 import uuid
 from fastapi import APIRouter, HTTPException, Request
-from novel_to_script.models import (
-    ConvertRequest,
-    ConvertResponse,
-    Meta,
-)
+from novel_to_script.models import ConvertRequest, ConvertResponse, Meta
 from novel_to_script.chapter_splitter import split_chapters
 from novel_to_script.llm_provider import DeepSeekProvider, MockProvider
 from novel_to_script.assembler import assemble_script
-from novel_to_script.config import has_api_key, set_api_key, get_api_key
+from novel_to_script import config as api_config
 from novel_to_script.auth import register_user, login_user, verify_token, get_user_profile, update_profile, change_password
-from novel_to_script.projects import (
-    create_project, list_projects, get_project, save_project, delete_project,
-    add_revision, list_revisions, get_revision,
-)
+from novel_to_script.projects import (create_project, list_projects, get_project, save_project, delete_project, add_revision, list_revisions, get_revision)
 
 api_router = APIRouter(prefix="/api")
-
 tasks: dict[str, dict] = {}
-llm_provider = MockProvider()  # 默认使用 Mock，用户设置 Key 后切换
+_user_providers: dict[int, DeepSeekProvider] = {}
 
 
-def _ensure_provider():
-    """如果用户设置了 Key 且当前是 Mock，切换到真实 Provider。"""
-    global llm_provider
-    if has_api_key() and isinstance(llm_provider, MockProvider):
-        llm_provider = DeepSeekProvider(get_api_key())
+async def _get_provider(user_id: int):
+    """Get or create user's LLM provider."""
+    if user_id not in _user_providers:
+        key = await api_config.get_api_key(user_id)
+        if key:
+            _user_providers[user_id] = DeepSeekProvider(key)
+    if user_id not in _user_providers:
+        return MockProvider()
+    return _user_providers[user_id]
 
+
+def _get_user_id(req: Request) -> int:
+    auth = req.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="需要登录")
+    payload = verify_token(auth[7:])
+    if not payload:
+        raise HTTPException(status_code=401, detail="登录已过期")
+    return payload["user_id"]
+
+
+# ====== Config ======
 
 @api_router.get("/config")
-async def get_config():
-    """返回当前配置状态。"""
-    return {"api_key_set": has_api_key()}
+async def api_get_config(req: Request):
+    try:
+        uid = _get_user_id(req)
+        ok = await api_config.has_api_key(uid)
+        return {"api_key_set": ok}
+    except HTTPException:
+        return {"api_key_set": False}
 
 
 @api_router.post("/config/key")
-async def update_api_key(request: dict):
-    """设置用户的 API Key。"""
+async def api_set_key(request: dict, req: Request):
+    uid = _get_user_id(req)
     key = request.get("api_key", "").strip()
     if not key:
         raise HTTPException(status_code=400, detail="API Key 不能为空")
-    set_api_key(key)
-    global llm_provider
-    llm_provider = DeepSeekProvider(key)
+    await api_config.set_api_key(uid, key)
+    _user_providers[uid] = DeepSeekProvider(key)
     return {"ok": True, "message": "API Key 已设置"}
 
 
-async def _process_conversion(
-    task_id: str, text: str, outline: dict | None = None, chapter_indices: list[int] | None = None
-):
-    """Background task: LLM calls for novel chapters, then assemble."""
+# ====== Convert ======
+
+async def _process_conversion(task_id: str, user_id: int, text: str,
+                               outline: dict | None = None, chapter_indices: list[int] | None = None):
     try:
         all_chapters = split_chapters(text)
-
-        # Filter to selected chapters if indices provided
         if chapter_indices is not None and len(chapter_indices) > 0:
             valid = sorted(i for i in chapter_indices if 0 <= i < len(all_chapters))
             chapters = [all_chapters[i] for i in valid]
         else:
             chapters = all_chapters
-        chapter_titles = [title for title, _ in chapters]
-        tasks[task_id]["chapters"] = chapter_titles
+        tasks[task_id]["chapters"] = [t for t, _ in chapters]
         tasks[task_id]["status"] = "processing"
         tasks[task_id]["progress"] = 5
 
-        all_chars, all_scenes = await llm_provider.convert_novel(chapters, outline)
+        provider = await _get_provider(user_id)
+        all_chars, all_scenes = await provider.convert_novel(chapters, outline)
 
-        meta = Meta(
-            title=f"{chapter_titles[0] if chapter_titles else 'Untitled'} Script",
-            original_work="Original Novel",
-            original_author="Unknown",
-        )
-
+        meta = Meta(title=f"{chapters[0][0] if chapters else 'Untitled'} Script",
+                    original_work="Original Novel", original_author="Unknown")
         script = assemble_script(meta, all_chars, all_scenes)
         tasks[task_id]["script"] = script
         tasks[task_id]["status"] = "completed"
         tasks[task_id]["progress"] = 100
-
     except ValueError as e:
-        tasks[task_id]["status"] = "error"
-        tasks[task_id]["error"] = str(e)
+        tasks[task_id]["status"] = "error"; tasks[task_id]["error"] = str(e)
     except Exception as e:
-        tasks[task_id]["status"] = "error"
-        tasks[task_id]["error"] = f"Conversion failed: {str(e)}"
+        tasks[task_id]["status"] = "error"; tasks[task_id]["error"] = f"Conversion failed: {str(e)}"
 
 
 @api_router.post("/convert", response_model=ConvertResponse)
-async def start_conversion(request: ConvertRequest):
-    """Submit novel text, return task_id immediately, process in background."""
-    _ensure_provider()
-    if not has_api_key():
-        raise HTTPException(status_code=400, detail="请先在页面顶部设置 API Key")
+async def start_conversion(request: ConvertRequest, req: Request):
+    uid = _get_user_id(req)
+    if not await api_config.has_api_key(uid):
+        raise HTTPException(status_code=400, detail="请先设置 API Key")
     chapters = split_chapters(request.text)
-
     if not chapters:
-        raise HTTPException(status_code=400, detail="No chapters detected. Check text format.")
-
+        raise HTTPException(status_code=400, detail="No chapters detected")
     task_id = str(uuid.uuid4())[:8]
-    chapter_titles = [title for title, _ in chapters]
-
-    tasks[task_id] = {
-        "status": "processing",
-        "progress": 5,
-        "chapters": chapter_titles,
-        "script": None,
-        "error": None,
-    }
-
-    asyncio.create_task(_process_conversion(task_id, request.text, request.outline, request.chapter_indices))
-
-    return ConvertResponse(
-        task_id=task_id,
-        status="processing",
-        progress=5,
-        chapters=chapter_titles,
-        script=None,
-    )
+    tasks[task_id] = {"status": "processing", "progress": 5, "chapters": [t for t, _ in chapters], "script": None, "error": None}
+    asyncio.create_task(_process_conversion(task_id, uid, request.text, request.outline, request.chapter_indices))
+    return ConvertResponse(task_id=task_id, status="processing", progress=5, chapters=[t for t, _ in chapters], script=None)
 
 
 @api_router.get("/convert/{task_id}", response_model=ConvertResponse)
 async def get_status(task_id: str):
-    """Poll task progress."""
     task = tasks.get(task_id)
-    if task is None:
-        raise HTTPException(status_code=404, detail="Task not found")
-    return ConvertResponse(
-        task_id=task_id,
-        status=task["status"],
-        progress=task["progress"],
-        chapters=task.get("chapters", []),
-        script=task.get("script"),
-        error=task.get("error"),
-    )
+    if not task: raise HTTPException(status_code=404, detail="Task not found")
+    return ConvertResponse(task_id=task_id, status=task["status"], progress=task["progress"], chapters=task.get("chapters", []), script=task.get("script"), error=task.get("error"))
 
 
-# ====== Outline Analysis ======
+# ====== Chapters / Outline ======
+
+@api_router.post("/chapters")
+async def detect_chapters(request: dict):
+    text = request.get("text", "")
+    if not text.strip(): raise HTTPException(status_code=400, detail="Text is required")
+    chapters = split_chapters(text)
+    return {"chapters": [{"index": i, "title": t, "length": len(c)} for i, (t, c) in enumerate(chapters)], "total_chapters": len(chapters), "total_chars": sum(len(c) for _, c in chapters)}
+
 
 OUTLINE_PROMPT = """You are a professional script analyst. Read the entire novel and produce a scene breakdown outline.
 
@@ -180,84 +162,34 @@ Return a JSON object (no markdown code blocks):
 2. Each scene should be a self-contained unit with clear beginning/end
 3. Character names must be from the actual novel text
 4. scene_number sequential across all chapters
-5. Return ONLY valid JSON, no extra text. DO NOT wrap in ```json markdown code blocks. Start your response with { and end with }."""
-
-
-
-@api_router.post("/chapters")
-async def detect_chapters(request: dict):
-    """Detect chapters in novel text, return list with char counts."""
-    text = request.get("text", "")
-    if not text.strip():
-        raise HTTPException(status_code=400, detail="Text is required")
-    chapters = split_chapters(text)
-    return {
-        "chapters": [
-            {"index": i, "title": t, "length": len(c)}
-            for i, (t, c) in enumerate(chapters)
-        ],
-        "total_chapters": len(chapters),
-        "total_chars": sum(len(c) for _, c in chapters),
-    }
+5. Return ONLY valid JSON, no extra text. Start your response with { and end with }."""
 
 
 @api_router.post("/outline")
-async def analyze_outline(request: dict):
-    """Quick structural analysis — returns scene breakdown + character preview."""
-    text = request.get("text", "")
-    if not text.strip():
-        raise HTTPException(status_code=400, detail="Text is required")
-    if isinstance(llm_provider, MockProvider) and not has_api_key():
-        raise HTTPException(status_code=400, detail="请先在页面顶部设置 API Key")
-
-    chapters = split_chapters(text)
-    if not chapters:
-        raise HTTPException(status_code=400, detail="No chapters detected")
-
+async def analyze_outline(request: dict, req: Request):
+    uid = _get_user_id(req)
+    if not await api_config.has_api_key(uid):
+        raise HTTPException(status_code=400, detail="请先设置 API Key")
+    text = request.get("text", ""); chapters = split_chapters(text)
+    if not text.strip(): raise HTTPException(status_code=400, detail="Text is required")
+    if not chapters: raise HTTPException(status_code=400, detail="No chapters detected")
     try:
-        _ensure_provider()
-        client = llm_provider._client
-        model = llm_provider._model
-
-        # For large novels, send first N chapters + last 3 for overview
-        MAX_OUTLINE_CHAPTERS = 20
-        if len(chapters) > MAX_OUTLINE_CHAPTERS:
-            outline_chapters = chapters[:MAX_OUTLINE_CHAPTERS - 3] + chapters[-3:]
-        else:
-            outline_chapters = chapters
-
-        parts = []
-        for title, content in outline_chapters:
-            truncated = content[:1500] + ("..." if len(content) > 1500 else "")
-            parts.append(f"## {title}\n\n{truncated}")
-        full_text = "\n\n---\n\n".join(parts)
-
-        resp = await client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": OUTLINE_PROMPT},
-                {"role": "user", "content": f"Analyze this novel ({len(chapters)} chapters total, showing first {MAX_OUTLINE_CHAPTERS-3} + last 3) and produce a scene breakdown outline:\n\n{full_text}"},
-            ],
-            temperature=0.5,
-            max_tokens=8192,
+        provider = await _get_provider(uid)
+        MAX_OUTLINE = 20
+        outline_chapters = chapters[:MAX_OUTLINE - 3] + chapters[-3:] if len(chapters) > MAX_OUTLINE else chapters
+        parts = [f"## {t}\n\n{c[:1500]}{'...' if len(c) > 1500 else ''}" for t, c in outline_chapters]
+        resp = await provider._client.chat.completions.create(
+            model=provider._model,
+            messages=[{"role": "system", "content": OUTLINE_PROMPT}, {"role": "user", "content": f"Analyze:\n\n{"\n".join(parts)}"}],
+            temperature=0.5, max_tokens=8192,
         )
-        content = resp.choices[0].message.content or ""
-
-        from novel_to_script.llm_provider import _extract_json
-        data = _extract_json(content)
-
-        return {
-            "chapter_outlines": data.get("chapter_outlines", []),
-            "character_preview": data.get("character_preview", []),
-            "total_scenes": data.get("total_scenes", 0),
-            "analysis_notes": data.get("analysis_notes", ""),
-            "chapter_titles": [title for title, _ in chapters],
-        }
+        from novel_to_script.llm_provider import _extract_json; data = _extract_json(resp.choices[0].message.content or "")
+        return {"chapter_outlines": data.get("chapter_outlines", []), "character_preview": data.get("character_preview", []), "total_scenes": data.get("total_scenes", 0), "analysis_notes": data.get("analysis_notes", ""), "chapter_titles": [t for t, _ in chapters]}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Outline analysis failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Outline failed: {str(e)}")
 
 
-# ====== AI Revision ======
+# ====== Revision ======
 
 REVISION_PROMPT = """You are a professional script editor. Given a complete script in JSON format and a user's revision instruction, modify the script accordingly.
 
@@ -267,8 +199,7 @@ REVISION_PROMPT = """You are a professional script editor. Given a complete scri
 2. Return the ENTIRE modified script as valid JSON — not just the changed parts.
 3. You may add/remove/modify scenes, characters, dialogue, actions, or any element.
 4. If adding new characters, assign them new IDs (char_NNN format, next available number).
-5. If the instruction changes a character's personality, update their traits[] and adjust their dialogue emotion/notes accordingly.
-6. Provide a brief summary of what you changed in Chinese.
+5. Provide a brief summary of what you changed in Chinese.
 
 ## Output Format
 
@@ -282,183 +213,87 @@ Return a JSON object (no markdown code blocks):
 
 
 @api_router.post("/revision")
-async def revise_script(request: dict):
-    """Accept a script JSON + user instruction, return AI-modified script."""
-    _ensure_provider()
-    if not has_api_key():
-        raise HTTPException(status_code=400, detail="请先在页面顶部设置 API Key")
-    script_json = request.get("script")
-    instruction = request.get("instruction", "")
-
+async def revise_script(request: dict, req: Request):
+    uid = _get_user_id(req)
+    if not await api_config.has_api_key(uid):
+        raise HTTPException(status_code=400, detail="请先设置 API Key")
+    script_json = request.get("script"); instruction = request.get("instruction", "")
     if not script_json or not instruction.strip():
         raise HTTPException(status_code=400, detail="script and instruction are required")
-
     try:
-        client = llm_provider._client
-        model = llm_provider._model
-
+        provider = await _get_provider(uid)
         payload = json.dumps(script_json, ensure_ascii=False, indent=2)
-        user_message = f"## Original Script\n\n```json\n{payload}\n```\n\n## Revision Instruction\n\n{instruction}"
-
-        resp = await client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": REVISION_PROMPT},
-                {"role": "user", "content": user_message},
-            ],
-            temperature=0.5,
-            max_tokens=16384,
+        resp = await provider._client.chat.completions.create(
+            model=provider._model,
+            messages=[{"role": "system", "content": REVISION_PROMPT}, {"role": "user", "content": f"## Original\n```json\n{payload}\n```\n\n## Instruction\n\n{instruction}"}],
+            temperature=0.5, max_tokens=16384,
         )
-        content = resp.choices[0].message.content or ""
-
-        from novel_to_script.llm_provider import _extract_json
-        data = _extract_json(content)
-
-        return {
-            "modified_script": data.get("modified_script", script_json),
-            "message": data.get("message", ""),
-            "changes_summary": data.get("changes_summary", []),
-        }
+        from novel_to_script.llm_provider import _extract_json; data = _extract_json(resp.choices[0].message.content or "")
+        return {"modified_script": data.get("modified_script", script_json), "message": data.get("message", ""), "changes_summary": data.get("changes_summary", [])}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI revision failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Revision failed: {str(e)}")
 
 
 # ====== Auth ======
 
-def _get_user_id(request: Request) -> int:
-    """从 Authorization header 提取 user_id"""
-    auth = request.headers.get("Authorization", "")
-    if not auth.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="需要登录")
-    payload = verify_token(auth[7:])
-    if not payload:
-        raise HTTPException(status_code=401, detail="登录已过期")
-    return payload["user_id"]
-
-
 @api_router.post("/auth/register")
 async def api_register(request: dict):
-    """注册"""
     result = await register_user(request.get("username", ""), request.get("password", ""))
-    if not result["ok"]:
-        raise HTTPException(status_code=400, detail=result["message"])
+    if not result["ok"]: raise HTTPException(status_code=400, detail=result["message"])
     return result
-
 
 @api_router.post("/auth/login")
 async def api_login(request: dict):
-    """登录"""
     result = await login_user(request.get("username", ""), request.get("password", ""))
-    if not result["ok"]:
-        raise HTTPException(status_code=400, detail=result["message"])
+    if not result["ok"]: raise HTTPException(status_code=400, detail=result["message"])
     return result
 
-
 @api_router.get("/auth/me")
-async def api_me(req: Request):
-    """获取当前用户信息 + 统计"""
-    uid = _get_user_id(req)
-    return await get_user_profile(uid)
-
+async def api_me(req: Request): return await get_user_profile(_get_user_id(req))
 
 @api_router.post("/auth/profile")
-async def api_update_profile(request: dict, req: Request):
-    """更新用户资料"""
-    uid = _get_user_id(req)
-    return await update_profile(uid, request.get("display_name", ""))
-
+async def api_update_profile(request: dict, req: Request): return await update_profile(_get_user_id(req), request.get("display_name", ""))
 
 @api_router.post("/auth/password")
 async def api_change_password(request: dict, req: Request):
-    """修改密码"""
-    uid = _get_user_id(req)
-    result = await change_password(
-        uid, request.get("old_password", ""), request.get("new_password", ""),
-    )
-    if not result["ok"]:
-        raise HTTPException(status_code=400, detail=result.get("message", "修改失败"))
+    result = await change_password(_get_user_id(req), request.get("old_password", ""), request.get("new_password", ""))
+    if not result["ok"]: raise HTTPException(status_code=400, detail=result.get("message", "修改失败"))
     return result
 
 
 # ====== Projects ======
 
 @api_router.post("/projects")
-async def api_create_project(request: dict, req: Request):
-    """创建项目"""
-    uid = _get_user_id(req)
-    name = request.get("name", "未命名项目")
-    text = request.get("text", "")
-    result = await create_project(uid, name, text)
-    return result
-
+async def api_create_project(request: dict, req: Request): return await create_project(_get_user_id(req), request.get("name", "未命名"), request.get("text", ""))
 
 @api_router.get("/projects")
-async def api_list_projects(req: Request):
-    """列出项目"""
-    uid = _get_user_id(req)
-    return await list_projects(uid)
-
+async def api_list_projects(req: Request): return await list_projects(_get_user_id(req))
 
 @api_router.get("/projects/{project_id}")
 async def api_get_project(project_id: int, req: Request):
-    """获取项目"""
-    uid = _get_user_id(req)
-    proj = await get_project(uid, project_id)
-    if not proj:
-        raise HTTPException(status_code=404, detail="项目不存在")
+    proj = await get_project(_get_user_id(req), project_id)
+    if not proj: raise HTTPException(status_code=404, detail="项目不存在")
     return proj
 
-
 @api_router.put("/projects/{project_id}")
-async def api_save_project(project_id: int, request: dict, req: Request):
-    """保存项目"""
-    uid = _get_user_id(req)
-    text = request.get("text", "")
-    script_json = request.get("script_json", "")
-    await save_project(uid, project_id, text, script_json)
-    return {"ok": True}
-
+async def api_save_project(project_id: int, request: dict, req: Request): return {"ok": await save_project(_get_user_id(req), project_id, request.get("text", ""), request.get("script_json", ""))}
 
 @api_router.delete("/projects/{project_id}")
 async def api_delete_project(project_id: int, req: Request):
-    """删除项目"""
-    uid = _get_user_id(req)
-    ok = await delete_project(uid, project_id)
-    if not ok:
-        raise HTTPException(status_code=404, detail="项目不存在")
+    if not await delete_project(_get_user_id(req), project_id): raise HTTPException(status_code=404, detail="项目不存在")
     return {"ok": True}
 
 
 # ====== Revisions ======
 
 @api_router.post("/projects/{project_id}/revisions")
-async def api_add_revision(project_id: int, request: dict, req: Request):
-    """记录一次生成/修改"""
-    uid = _get_user_id(req)
-    r = await add_revision(
-        project_id,
-        request.get("action", "生成"),
-        request.get("script_json", ""),
-        request.get("chapter_count", 0),
-        request.get("scene_count", 0),
-        request.get("chapter_names", ""),
-        request.get("revision_id", 0),
-    )
-    return r
-
+async def api_add_revision(project_id: int, request: dict, req: Request): return await add_revision(project_id, request.get("action", "生成"), request.get("script_json", ""), request.get("chapter_count", 0), request.get("scene_count", 0), request.get("chapter_names", ""), request.get("revision_id", 0))
 
 @api_router.get("/projects/{project_id}/revisions")
-async def api_list_revisions(project_id: int, req: Request):
-    """获取项目历史"""
-    uid = _get_user_id(req)
-    return await list_revisions(project_id)
-
+async def api_list_revisions(project_id: int, req: Request): return await list_revisions(project_id)
 
 @api_router.get("/projects/{project_id}/revisions/{revision_id}")
 async def api_get_revision(project_id: int, revision_id: int, req: Request):
-    """获取某个版本详情"""
-    uid = _get_user_id(req)
     r = await get_revision(revision_id)
-    if not r:
-        raise HTTPException(status_code=404, detail="版本不存在")
+    if not r: raise HTTPException(status_code=404, detail="版本不存在")
     return r

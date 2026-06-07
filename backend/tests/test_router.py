@@ -10,28 +10,34 @@ from novel_to_script.llm_provider import MockProvider
 
 @pytest_asyncio.fixture
 async def client():
-    """使用 MockProvider 的测试客户端，避免调用真实 API"""
+    """Override user provider with MockProvider for tests"""
     import novel_to_script.router as router_module
+
+    mock = MockProvider()
+    original_get_provider = router_module._get_provider
+    async def _mock_get_provider(uid): return mock
+    router_module._get_provider = _mock_get_provider
+
+    # Ensure test user has API key set
     import novel_to_script.config as config_module
-    original_provider = router_module.llm_provider
-    original_key = config_module.get_api_key()
-    original_ensure = router_module._ensure_provider
-    router_module.llm_provider = MockProvider()
-    router_module._ensure_provider = lambda: None  # skip real provider check
-    config_module.set_api_key("test-key")
+    await config_module.set_api_key(1, "test-key")
+
+    # Patch verify_token in router module (not auth module — router imported it already)
+    original_verify = router_module.verify_token
+    router_module.verify_token = lambda t: ({"user_id": 1, "username": "test"} if t == "fake-token" else None)
+
     try:
         async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
+            transport=ASGITransport(app=app), base_url="http://test",
+            headers={"Authorization": "Bearer fake-token"}
         ) as ac:
             yield ac
     finally:
-        router_module.llm_provider = original_provider
-        router_module._ensure_provider = original_ensure
-        config_module.set_api_key(original_key or "")
+        router_module._get_provider = original_get_provider
+        router_module.verify_token = original_verify
 
 
 async def poll_until_done(client, task_id: str, timeout: float = 5.0):
-    """轮询任务状态直到完成或超时。"""
     deadline = asyncio.get_event_loop().time() + timeout
     while asyncio.get_event_loop().time() < deadline:
         resp = await client.get(f"/api/convert/{task_id}")
@@ -39,75 +45,56 @@ async def poll_until_done(client, task_id: str, timeout: float = 5.0):
         if data["status"] in ("completed", "error"):
             return data
         await asyncio.sleep(0.05)
-    raise TimeoutError(f"任务 {task_id} 在 {timeout}s 内未完成")
+    raise TimeoutError(f"Task {task_id} not done in {timeout}s")
 
 
 class TestHealthCheck:
     @pytest.mark.asyncio
     async def test_health(self, client):
-        response = await client.get("/api/health")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["status"] == "ok"
+        r = await client.get("/api/health")
+        assert r.status_code == 200
+        assert r.json()["status"] == "ok"
 
 
 class TestConvert:
     @pytest.mark.asyncio
     async def test_convert_with_chapters(self, client):
-        """提交含3章文本 → 立即返回 processing → 轮询后完成"""
         pad = "X" * 120
         text = f"第1章 测试\n{pad}\n第2章 继续\n{pad}\n第3章 结尾\n{pad}"
-
-        response = await client.post(
-            "/api/convert",
-            json={"text": text},
-        )
-        assert response.status_code == 200
-        data = response.json()
-        assert data["status"] == "processing"
-        assert data["task_id"] is not None
-        assert len(data["chapters"]) == 3
-
-        # 轮询等待后台处理完成
-        completed = await poll_until_done(client, data["task_id"])
-        assert completed["status"] == "completed"
-        assert completed["progress"] == 100
-        assert completed["script"] is not None
-        assert "meta" in completed["script"]
-        assert "characters" in completed["script"]
-        assert "scenes" in completed["script"]
+        r = await client.post("/api/convert", json={"text": text})
+        assert r.status_code == 200
+        d = r.json()
+        assert d["status"] == "processing"
+        assert d["task_id"] is not None
+        assert len(d["chapters"]) == 3
+        c = await poll_until_done(client, d["task_id"])
+        assert c["status"] == "completed"
+        assert c["progress"] == 100
+        assert c["script"] is not None
+        assert "meta" in c["script"]
+        assert "characters" in c["script"]
+        assert "scenes" in c["script"]
 
     @pytest.mark.asyncio
     async def test_convert_empty_text(self, client):
-        """空文本应返回 422"""
-        response = await client.post(
-            "/api/convert",
-            json={"text": ""},
-        )
-        assert response.status_code == 422
+        r = await client.post("/api/convert", json={"text": ""})
+        assert r.status_code == 422
 
     @pytest.mark.asyncio
     async def test_convert_no_chapters(self, client):
-        """无章节标记的文本 → 返回 '全文' 并完成"""
         text = "这是一段没有任何章节标记的文本。"
-        response = await client.post(
-            "/api/convert",
-            json={"text": text},
-        )
-        assert response.status_code == 200
-        data = response.json()
-        assert data["status"] == "processing"
-        assert data["task_id"] is not None
-        assert len(data["chapters"]) == 1
-        assert data["chapters"][0] == "全文"
-
-        completed = await poll_until_done(client, data["task_id"])
-        assert completed["status"] == "completed"
+        r = await client.post("/api/convert", json={"text": text})
+        assert r.status_code == 200
+        d = r.json()
+        assert d["status"] == "processing"
+        assert d["task_id"] is not None
+        assert d["chapters"] == ["全文"]
+        c = await poll_until_done(client, d["task_id"])
+        assert c["status"] == "completed"
 
 
 class TestStatus:
     @pytest.mark.asyncio
     async def test_get_status_not_found(self, client):
-        """不存在的任务应返回 404"""
-        response = await client.get("/api/convert/nonexistent")
-        assert response.status_code == 404
+        r = await client.get("/api/convert/nonexistent")
+        assert r.status_code == 404
