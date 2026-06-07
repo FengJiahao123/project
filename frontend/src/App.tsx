@@ -47,7 +47,7 @@ function App() {
     setToken(t); setUsername(name); setAuthChecked(true); setView('projects')
   }
   const handleLogout = () => {
-    ['token','username','token_time','user_api_key'].forEach(k => localStorage.removeItem(k))
+    ['token','username','token_time'].forEach(k => localStorage.removeItem(k))
     setToken(null); setUsername(''); setView('projects')
   }
   const onLogout = handleLogout
@@ -147,25 +147,14 @@ function App() {
   const [apiKeySet, setApiKeySet] = useState(false)
   const [showKeyInput, setShowKeyInput] = useState(false)
 
-  // Auto-restore API key from localStorage
   useEffect(() => {
-    checkConfig().then(async (c) => {
-      if (!c.api_key_set) {
-        const storedKey = localStorage.getItem('user_api_key')
-        if (storedKey) {
-          try { await setApiKey(storedKey); const c2 = await checkConfig(); setApiKeySet(c2.api_key_set) }
-          catch { localStorage.removeItem('user_api_key') }
-        }
-      }
-      setApiKeySet(c.api_key_set)
-    }).catch(() => {})
+    checkConfig().then((c) => setApiKeySet(c.api_key_set)).catch(() => {})
   }, [])
 
   const handleSetKey = async () => {
     if (!apiKey.trim()) return
     try {
       await setApiKey(apiKey.trim())
-      localStorage.setItem('user_api_key', apiKey.trim())
       const config = await checkConfig()
       setApiKeySet(config.api_key_set)
       setShowKeyInput(false)
