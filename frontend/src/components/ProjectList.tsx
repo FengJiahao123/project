@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { apiListProjects, apiDeleteProject, apiListRevisions } from '../api'
+import { apiListProjects, apiDeleteProject, apiListRevisions, checkConfig, setApiKey } from '../api'
 import Icon from './Icon'
 import SettingsPage from './SettingsPage'
 
@@ -22,6 +22,15 @@ export default function ProjectList({ onOpen, onOpenRevision, onNew, onLogout, u
   const [revisions, setRevisions] = useState<Record<number, any[]>>({})
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [apiKeySet, setApiKeySet] = useState(false)
+  const [apiKey, setApiKeyInput] = useState('')
+
+  useEffect(() => { checkConfig().then(c => setApiKeySet(c.api_key_set)).catch(() => {}) }, [])
+  const handleSetKey = async () => {
+    if (!apiKey.trim()) return
+    try { await setApiKey(apiKey.trim()); const c = await checkConfig(); setApiKeySet(c.api_key_set); setApiKeyInput('') }
+    catch {}
+  }
 
   useEffect(() => { apiListProjects().then(setProjects).finally(() => setLoading(false)) }, [])
   useEffect(() => {
@@ -164,6 +173,33 @@ export default function ProjectList({ onOpen, onOpenRevision, onNew, onLogout, u
       {/* Settings */}
       {showSettings && (
         <SettingsPage username={username} onClose={() => setShowSettings(false)} onLogout={onLogout} />
+      )}
+
+      {/* API Key banner */}
+      {!apiKeySet && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-amber-50 border-t-2 border-amber-400 shadow-2xl">
+          <div className="max-w-3xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-amber-200 flex items-center justify-center shrink-0">
+                <Icon name="key" size={18} className="text-amber-800" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-amber-900">需要 API Key</p>
+                <p className="text-xs text-amber-700">输入 DeepSeek API Key 以启用 AI 转换</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <input className="text-sm px-4 py-2.5 border-2 border-amber-400 rounded-lg w-80 font-mono outline-none focus:border-amber-600 bg-white"
+                type="password" placeholder="sk-..." value={apiKey}
+                onChange={(e) => setApiKeyInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSetKey() }} />
+              <button onClick={handleSetKey} disabled={!apiKey.trim()}
+                className="px-6 py-2.5 bg-amber-600 text-white text-sm font-bold rounded-lg hover:bg-amber-700 disabled:opacity-50 transition-colors whitespace-nowrap">
+                保存
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
