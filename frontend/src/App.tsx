@@ -17,8 +17,8 @@ const PHASE_CONFIG = [
 
 function App() {
   // ====== Auth ======
-  const [token, setToken] = useState(localStorage.getItem('token'))
-  const [username, setUsername] = useState(localStorage.getItem('username') || '')
+  const [token, setToken] = useState(sessionStorage.getItem('token'))
+  const [username, setUsername] = useState(sessionStorage.getItem('username') || '')
   const [view, setView] = useState<'projects' | 'editor'>('projects')
   const [projectId, setProjectId] = useState<number | null>(null)
   const [projectName, setProjectName] = useState('')
@@ -30,7 +30,7 @@ function App() {
     if (token) {
       apiListProjects()
         .then(() => setAuthChecked(true))
-        .catch(() => { localStorage.removeItem('token'); localStorage.removeItem('username'); setToken(null); setAuthChecked(true) })
+        .catch(() => { sessionStorage.removeItem('token'); sessionStorage.removeItem('username'); setToken(null); setAuthChecked(true) })
     } else {
       setAuthChecked(true)
     }
@@ -40,7 +40,7 @@ function App() {
     setToken(t); setUsername(name); setAuthChecked(true); setView('projects')
   }
   const handleLogout = () => {
-    localStorage.removeItem('token'); localStorage.removeItem('username')
+    sessionStorage.removeItem('token'); sessionStorage.removeItem('username')
     setToken(null); setUsername(''); setView('projects')
   }
   const onLogout = handleLogout

@@ -18,8 +18,8 @@ export default function AuthPage({ onLogin }: Props) {
       const fn = mode === 'login' ? apiLogin : apiRegister
       const result = await fn(username.trim(), password)
       if (result.ok) {
-        localStorage.setItem('token', result.token)
-        localStorage.setItem('username', result.username)
+        sessionStorage.setItem('token', result.token)
+        sessionStorage.setItem('username', result.username)
         onLogin(result.token, result.username)
       } else { setError(result.message) }
     } catch { setError('网络错误，请稍后重试') }
