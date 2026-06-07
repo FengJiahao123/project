@@ -17,21 +17,28 @@ const PHASE_CONFIG = [
 
 function App() {
   // ====== Auth ======
-  const [token, setToken] = useState(sessionStorage.getItem('token'))
-  const [username, setUsername] = useState(sessionStorage.getItem('username') || '')
+  const [token, setToken] = useState<string | null>(null)
+  const [username, setUsername] = useState('')
   const [view, setView] = useState<'projects' | 'editor'>('projects')
   const [projectId, setProjectId] = useState<number | null>(null)
   const [projectName, setProjectName] = useState('')
-  const currentRevisionId = useRef(0)    // 当前会话的版本ID, 修改时更新同一条
+  const currentRevisionId = useRef(0)
   const [authChecked, setAuthChecked] = useState(false)
 
-  // Validate token on mount
+  // Token with 30-min inactivity expiry
   useEffect(() => {
-    if (token) {
+    const stored = localStorage.getItem('token')
+    const stamp = localStorage.getItem('token_time')
+    const expired = stamp ? (Date.now() - Number(stamp)) > 30 * 60 * 1000 : true
+    if (stored && !expired) {
+      localStorage.setItem('token_time', Date.now().toString())
+      setToken(stored)
+      setUsername(localStorage.getItem('username') || '')
       apiListProjects()
         .then(() => setAuthChecked(true))
-        .catch(() => { sessionStorage.removeItem('token'); sessionStorage.removeItem('username'); setToken(null); setAuthChecked(true) })
+        .catch(() => { ['token','username','token_time'].forEach(k => localStorage.removeItem(k)); setToken(null); setAuthChecked(true) })
     } else {
+      if (stored && expired) ['token','username','token_time'].forEach(k => localStorage.removeItem(k))
       setAuthChecked(true)
     }
   }, [])
@@ -40,7 +47,7 @@ function App() {
     setToken(t); setUsername(name); setAuthChecked(true); setView('projects')
   }
   const handleLogout = () => {
-    sessionStorage.removeItem('token'); sessionStorage.removeItem('username')
+    ['token','username','token_time'].forEach(k => localStorage.removeItem(k))
     setToken(null); setUsername(''); setView('projects')
   }
   const onLogout = handleLogout

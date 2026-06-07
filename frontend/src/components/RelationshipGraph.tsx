@@ -72,27 +72,51 @@ export default function RelationshipGraph({ script }: Props) {
             </marker>
           </defs>
 
-          {/* Edges */}
-          {edges.map((e, i) => {
-            const a = nodeMap.get(e.from); const b = nodeMap.get(e.to)
-            if (!a || !b) return null
-            const dx = b.x - a.x; const dy = b.y - a.y
-            const dist = Math.sqrt(dx * dx + dy * dy)
-            const ux = dx / dist; const uy = dy / dist
-            const x1 = a.x + ux * a.r
-            const y1 = a.y + uy * a.r
-            const x2 = b.x - ux * (b.r + 8)
-            const y2 = b.y - uy * (b.r + 8)
-            const mx = (x1 + x2) / 2; const my = (y1 + y2) / 2
+          {/* Edges — with anti-overlap label offset */}
+          {(() => {
+            // Compute all midpoints first, then check for overlaps
+            const edgeData: { a: typeof nodes[0]; b: typeof nodes[0]; label: string; mx: number; my: number; x1: number; y1: number; x2: number; y2: number }[] = []
+            for (const e of edges) {
+              const a = nodeMap.get(e.from); const b = nodeMap.get(e.to)
+              if (!a || !b) continue
+              const dx = b.x - a.x; const dy = b.y - a.y
+              const dist = Math.sqrt(dx * dx + dy * dy)
+              const ux = dx / dist; const uy = dy / dist
+              const x1 = a.x + ux * a.r; const y1 = a.y + uy * a.r
+              const x2 = b.x - ux * (b.r + 8); const y2 = b.y - uy * (b.r + 8)
+              edgeData.push({ a, b, label: e.label, mx: (x1 + x2) / 2, my: (y1 + y2) / 2, x1, y1, x2, y2 })
+            }
 
-            return (
-              <g key={`edge-${i}`}>
-                <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#d4c8b8" strokeWidth={1.2} markerEnd="url(#arrowhead)" />
-                <rect x={mx - e.label.length * 7} y={my - 9} width={e.label.length * 14} height={16} rx={4} fill="#fefdfb" opacity={0.9} stroke="#e7e0d8" strokeWidth={0.5} />
-                <text x={mx} y={my + 1} textAnchor="middle" fill="#8b6914" fontSize="10" fontFamily="-apple-system, sans-serif">{e.label}</text>
-              </g>
-            )
-          })}
+            // Detect overlaps: if two mids are within 50px, offset perpendicular
+            const offsets: number[] = Array(edgeData.length).fill(0)
+            for (let i = 0; i < edgeData.length; i++) {
+              for (let j = i + 1; j < edgeData.length; j++) {
+                const dx = edgeData[i].mx - edgeData[j].mx
+                const dy = edgeData[i].my - edgeData[j].my
+                if (Math.sqrt(dx * dx + dy * dy) < 50) {
+                  offsets[i] = offsets[i] || 15 * ((i % 2 === 0) ? 1 : -1)
+                  offsets[j] = offsets[j] || -offsets[i]
+                }
+              }
+            }
+
+            return edgeData.map((ed, i) => {
+              // Perpendicular offset
+              const dx = ed.b.x - ed.a.x; const dy = ed.b.y - ed.a.y
+              const pdx = -dy / (Math.sqrt(dx * dx + dy * dy) || 1)
+              const pdy = dx / (Math.sqrt(dx * dx + dy * dy) || 1)
+              const off = offsets[i]
+              const lx = ed.mx + pdx * off; const ly = ed.my + pdy * off
+
+              return (
+                <g key={`edge-${i}`}>
+                  <line x1={ed.x1} y1={ed.y1} x2={ed.x2} y2={ed.y2} stroke="#d4c8b8" strokeWidth={1.2} markerEnd="url(#arrowhead)" />
+                  <rect x={lx - ed.label.length * 7} y={ly - 9} width={ed.label.length * 14} height={16} rx={4} fill="#fefdfb" opacity={0.92} stroke="#e7e0d8" strokeWidth={0.5} />
+                  <text x={lx} y={ly + 1} textAnchor="middle" fill="#8b6914" fontSize="10" fontFamily="-apple-system, sans-serif">{ed.label}</text>
+                </g>
+              )
+            })
+          })()}
 
           {/* Nodes */}
           {nodes.map((n) => {
