@@ -3,7 +3,7 @@
 import json
 import re
 from typing import Protocol, runtime_checkable
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, AuthenticationError
 from novel_to_script.models import (
     Script, Meta, Character, Scene, Location,
     ActionElement, DialogueElement, TransitionElement,
@@ -237,15 +237,21 @@ class DeepSeekProvider:
 
         user_msg = full_text + outline_guide
 
-        response = await self._client.chat.completions.create(
-            model=self._model,
-            messages=[
-                {"role": "system", "content": FULL_NOVEL_PROMPT},
-                {"role": "user", "content": user_msg},
-            ],
-            temperature=0.7,
-            max_tokens=32768,
-        )
+        try:
+            response = await self._client.chat.completions.create(
+                model=self._model,
+                messages=[
+                    {"role": "system", "content": FULL_NOVEL_PROMPT},
+                    {"role": "user", "content": user_msg},
+                ],
+                temperature=0.7,
+                max_tokens=32768,
+            )
+        except AuthenticationError:
+            raise ValueError("API Key 无效，请检查后重新设置")
+        except Exception as e:
+            raise ValueError(f"LLM API 调用失败: {str(e)[:100]}")
+
         content = response.choices[0].message.content or ""
         data = _extract_json(content)
         characters = [_build_character(c) for c in data.get("characters", [])]
