@@ -244,7 +244,7 @@ class DeepSeekProvider:
                 {"role": "user", "content": user_msg},
             ],
             temperature=0.7,
-            max_tokens=65536,
+            max_tokens=32768,
         )
         content = response.choices[0].message.content or ""
         data = _extract_json(content)
@@ -311,51 +311,38 @@ def _extract_json(text: str) -> dict:
             except json.JSONDecodeError:
                 pass
 
-    # 6: auto-repair truncated JSON (incomplete last field stripped, brackets closed LIFO)
+    # 6: auto-repair truncated JSON (output cut off by max_tokens)
     if start != -1:
         chunk = t[start:]
 
-        def _close_brackets(s: str) -> str:
-            """Close unclosed brackets in LIFO order."""
-            # Walk through s, tracking the stack of openers
-            stack = []
-            for ch in s:
-                if ch == '{': stack.append('}')
-                elif ch == '}':
-                    if stack and stack[-1] == '}': stack.pop()
-                elif ch == '[': stack.append(']')
-                elif ch == ']':
-                    if stack and stack[-1] == ']': stack.pop()
-            return s + ''.join(reversed(stack))
+        # Count unmatched brackets
+        stack: list[str] = []
+        for ch in chunk:
+            if ch == '{': stack.append('}')
+            elif ch == '[': stack.append(']')
+            elif ch == '}':
+                if stack and stack[-1] == '}': stack.pop()
+            elif ch == ']':
+                if stack and stack[-1] == ']': stack.pop()
 
-        # 6a: Strip back to last comma, close brackets, try parse
-        last_comma = chunk.rfind(',')
-        if last_comma > 0:
-            trial = _close_brackets(chunk[:last_comma])
+        if stack:
+            # Truncate — strip last comma fragment, close brackets
+            last_comma = chunk.rfind(',')
+            if last_comma > 0:
+                trial = chunk[:last_comma] + ''.join(reversed(stack))
+                try:
+                    return json.loads(trial)
+                except json.JSONDecodeError:
+                    pass
+
+            # Fallback: just close brackets
+            trial = chunk + ''.join(reversed(stack))
             try:
                 return json.loads(trial)
             except json.JSONDecodeError:
                 pass
 
-        # 6b: Strip to last closing bracket + open new brackets
-        last_brace = chunk.rfind('}')
-        last_bracket = chunk.rfind(']')
-        last_closer = max(last_brace, last_bracket)
-        if last_closer > 0:
-            trial = _close_brackets(chunk[:last_closer + 1])
-            try:
-                return json.loads(trial)
-            except json.JSONDecodeError:
-                pass
-
-        # 6c: Just close brackets on full chunk
-        trial = _close_brackets(chunk)
-        try:
-            return json.loads(trial)
-        except json.JSONDecodeError:
-            pass
-
-    raise ValueError(f"Cannot parse JSON from LLM response: {text[:300]}...")
+    raise ValueError("Cannot parse JSON from LLM response")
 
 
 def _map_role(role: str) -> str:
