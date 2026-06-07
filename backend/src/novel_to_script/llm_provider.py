@@ -17,7 +17,7 @@ FULL_NOVEL_PROMPT = """你是一个专业的剧本转写专家。你的任务是
 
 返回 JSON（不要 markdown 包裹）：
 {
-  "characters": [{"id": "char_001", "name": "角色名", "role": "主角/配角/龙套", "description": "角色背景", "traits": ["性格标签"]}],
+  "characters": [{"id": "char_001", "name": "角色名", "role": "主角/配角/龙套", "description": "角色背景", "traits": ["性格标签"], "relationships": [{"target": "char_002", "relation": "朋友"}]}],
   "scenes": [{
     "scene_number": 1,
     "location": {"name": "地点", "time": "清晨/上午/下午/傍晚/夜晚", "description": "环境细节"},
@@ -55,6 +55,13 @@ FULL_NOVEL_PROMPT = """你是一个专业的剧本转写专家。你的任务是
 - 回到家、与邻居对话 → 场景6
 
 **检查方法**：生成后数一下，一章 3000 字至少产出 4 个场景。如果只有 2 个场景，肯定漏了。
+
+## 角色关系
+
+每个角色必须填写 relationships 数组，分析原文中人物之间的关系：
+- 朋友、邻居、主仆、师徒、父子、敌人、同门、恋人 等
+- target 填写目标角色的 id（如 char_002）
+- 至少为主要角色之间的重要关系标注
 
 ## 回忆/闪回的处理（非常重要）
 
